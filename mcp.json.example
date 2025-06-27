@@ -1,0 +1,12 @@
+{
+  "servers": {
+    "MsDbServer": {
+      "command": "dotnet",
+      "args": ["run", "--project", "MsDbServer/MsDbServer.csproj"],
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "ConnectionStrings__DefaultConnection": "server=localhost;port=3306;database=your_database;user=your_user;password=your_password"
+      }
+    }
+  }
+}
