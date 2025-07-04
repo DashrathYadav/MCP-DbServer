@@ -1,571 +1,296 @@
-# MsDbServer - MySQL Database MCP Server
+# Modern MCP Database Server - 2025-06-18 Specification
 
-A powerful Model Context Protocol (MCP) server that provides MySQL database introspection capabilities for AI assistants like GitHub Copilot. Built with .NET 8 and the official Microsoft MCP SDK.
+## Overview
 
-## 🎯 What is this?
+This MySQL MCP (Model Context Protocol) server implements the latest **2025-06-18 MCP specification** with a modern clean architecture approach. It provides secure, efficient database introspection capabilities for LLMs with structured outputs, resource links, and multi-transport support.
 
-**MsDbServer** is an MCP (Model Context Protocol) server that acts as a bridge between AI assistants and MySQL databases. It allows you to ask natural language questions about your database structure and get instant, detailed responses.
+## 🌟 **Key Features**
 
-### Example Usage with GitHub Copilot:
+### ✅ **MCP 2025-06-18 Compliance**
+- **ModelContextProtocol SDK v0.3.0-preview.2** - Latest C# SDK
+- **Structured Tool Output** - All tools return structured JSON content
+- **Resource Links** - Tools can return links to database resources
+- **Tool Title Fields** - Human-friendly display names for tools
+- **Comprehensive Metadata** - Rich tool metadata with annotations
+- **Modern Error Handling** - Structured error responses with `CallToolResult`
 
-- 🗣️ "List all tables in my database"
-- 🗣️ "Show me the structure of the users table"
-- 🗣️ "What are the foreign key relationships?"
-- 🗣️ "Execute this query: SELECT COUNT(\*) FROM orders"
+### ✅ **Clean Architecture Implementation**
+- **Layered Design** - Transport, Presentation, Application, Domain, Infrastructure
+- **Dependency Injection** - Full DI container integration
+- **Repository Pattern** - Database abstraction layer
+- **Options Pattern** - Configurable service settings
+- **Multi-Transport Support** - STDIO and HTTP transports
 
-## ✨ Features
+### ✅ **Advanced Database Features**
+- **Connection Pooling** - Optimized MySQL connection management
+- **Async/Await Patterns** - Non-blocking database operations
+- **Structured Logging** - Comprehensive logging with correlation IDs
+- **Performance Monitoring** - Query execution timing and metrics
+- **Security Hardening** - Parameter validation and secure connections
 
-### 🛠️ 6 Powerful Database Tools
+### ✅ **Multi-Transport Support**
+- **STDIO Transport** - Standard MCP transport for client integration
+- **HTTP Transport** - RESTful API with health checks and Swagger
+- **Extensible Design** - Easy to add WebSocket, gRPC, or custom transports
 
-| Tool                        | Description                                       | Example                            |
-| --------------------------- | ------------------------------------------------- | ---------------------------------- |
-| **`ListTables`**            | Get all tables in database                        | "Show me all tables"               |
-| **`DescribeTable`**         | Detailed table schema with columns, keys, indexes | "Describe the users table"         |
-| **`ExecuteQuery`**          | Run SELECT queries safely (with limits)           | "Query the first 10 users"         |
-| **`GetDatabaseStats`**      | Database size, table counts, statistics           | "Get database statistics"          |
-| **`GetSchemaInfo`**         | Multiple table schemas with pattern matching      | "Show tables starting with 'user'" |
-| **`GetTableRelationships`** | Foreign key dependencies and relationships        | "Show table relationships"         |
+## Available Tools
 
-### 🔒 Safety Features
+### 1. **test_connection** - Database Connection Test
 
-- ✅ **Query Restrictions** - Only SELECT and WITH statements allowed
-- ✅ **Row Limits** - Maximum 1000 rows per query
-- ✅ **Timeout Protection** - 30-second query timeout
-- ✅ **Input Validation** - All inputs sanitized and validated
+- **Description**: Test database connection with structured output and resource links
+- **Features**:
+  - Connection validation
+  - Database statistics
+  - Resource links to schema and stats
+  - Structured JSON output
+- **Returns**: Connection status, database info, and resource links
 
-### 🏗️ Technical Features
+### 2. **describe_table** - Table Structure Analysis
 
-- ✅ **Built with Microsoft MCP SDK** - Official ModelContextProtocol package
-- ✅ **MySQL Support** - Full MySQL database introspection
-- ✅ **Async Operations** - Non-blocking database operations
-- ✅ **Rich Formatting** - Beautiful, readable output
-- ✅ **Error Handling** - Comprehensive error messages
-- ✅ **VS Code Integration** - Works seamlessly with GitHub Copilot
+- **Description**: Get detailed table structure including columns, keys, and constraints
+- **Features**:
+  - Column information (types, constraints, defaults)
+  - Primary and foreign keys
+  - Index information
+  - Structured metadata
+- **Parameters**: `tableName` (required), `schemaName` (optional)
 
-## 🚀 Quick Start
+### 3. **list_tables** - Database Table Listing
 
-### Prerequisites
+- **Description**: Get all tables in the database
+- **Features**:
+  - Sorted table list
+  - Table count metadata
+  - Clean formatted output
+- **Returns**: List of all database tables
 
-- [.NET 8.0 SDK](https://dotnet.microsoft.com/download/dotnet/8.0) or later
-- MySQL database (accessible)
-- [Visual Studio Code](https://code.visualstudio.com/) with [GitHub Copilot](https://github.com/features/copilot)
+### 4. **execute_query** - SQL Query Execution
 
-### 1. Clone and Setup
+- **Description**: Execute SQL queries with result limits and timeout protection
+- **Features**:
+  - Query result limiting (default 100 rows)
+  - Execution time tracking
+  - Structured result format
+  - SQL injection protection
+- **Parameters**: `query` (required), `maxRows` (optional, default 100)
 
-```bash
-git clone https://github.com/your-username/MsDbServer.git
-cd MsDbServer
+### 5. **get_database_stats** - Database Statistics
+
+- **Description**: Comprehensive database statistics with structured output
+- **Features**:
+  - Table counts and sizes
+  - Database version information
+  - Performance metrics
+  - Structured JSON metadata
+- **Returns**: Complete database statistics
+
+### 6. **get_schema_info** - Schema Information
+
+- **Description**: Get detailed schema information for tables
+- **Features**:
+  - Pattern matching support (% wildcards)
+  - Complete table structures
+  - Relationship information
+  - Batch processing for performance
+- **Parameters**: `tablePattern` (optional, supports wildcards)
+
+### 7. **get_table_relationships** - Relationship Analysis
+
+- **Description**: Analyze foreign key relationships between tables
+- **Features**:
+  - Parent-child relationships
+  - Constraint information
+  - Dependency mapping
+  - Structured relationship data
+- **Parameters**: `tableName` (optional, filter by table)
+
+## Modern Architecture
+
+### Database Service Layer
+
+```csharp
+// Modern connection pooling and async patterns
+public class MySqlDatabaseService : IDatabaseService, IDisposable
+{
+    // Singleton connection with semaphore for thread safety
+    private readonly SemaphoreSlim _connectionSemaphore;
+    // Structured logging with scopes
+    private readonly ILogger<MySqlDatabaseService> _logger;
+    // Options pattern for configuration
+    private readonly McpDatabaseServiceOptions _options;
+}
 ```
 
-### 2. Configure Database Connection
+### Tool Implementation
 
-Edit `MsDbServer/appsettings.json`:
+```csharp
+// Modern tool with structured output and resource links
+[McpServerTool(Name = "test_connection", Title = "Test Database Connection")]
+public static async Task<CallToolResult> TestConnection(IDatabaseService databaseService)
+{
+    // Structured content with JSON schema
+    var structuredData = JsonSerializer.SerializeToNode(new { ... });
+
+    // Resource links for additional context
+    content.Add(new ResourceLinkBlock
+    {
+        Type = "resource_link",
+        Uri = $"mysql://schema/{databaseName}",
+        Name = $"{databaseName}-schema",
+        Description = "Complete database schema",
+        MimeType = "application/sql"
+    });
+
+    return new CallToolResult
+    {
+        Content = content,
+        StructuredContent = structuredData,
+        Meta = metadata
+    };
+}
+```
+
+## Configuration
+
+### Quick Setup
+
+1. **Copy the example configuration:**
+
+   ```powershell
+   cd MCP-DbServer\MsDbServer
+   copy appsettings.json.example appsettings.json
+   ```
+
+2. **Update your database connection:**
+   Edit `appsettings.json` with your MySQL database details:
+
+### Database Configuration
 
 ```json
 {
   "ConnectionStrings": {
-    "DefaultConnection": "server=localhost;port=3306;database=your_database;user=your_user;password=your_password"
+    "DefaultConnection": "server=localhost;port=3306;database=your_db;user=root;password=your_password"
   }
 }
 ```
 
-### 3. Test the Server
+### Service Options
 
-```bash
-cd MsDbServer
-dotnet build
-dotnet run
-```
-
-### 4. Setup VS Code Integration
-
-Create `.vscode/mcp.json` in your project:
-
-```json
+```csharp
+public class McpDatabaseServiceOptions
 {
-  "servers": {
-    "MsDbServer": {
-      "command": "dotnet",
-      "args": ["run", "--project", "path/to/MsDbServer/MsDbServer.csproj"],
-      "cwd": "${workspaceFolder}",
-      "env": {
-        "ConnectionStrings__DefaultConnection": "server=localhost;port=3306;database=your_database;user=your_user;password=your_password"
-      }
-    }
-  }
+    public int MaxPoolSize { get; set; } = 20;
+    public int MinPoolSize { get; set; } = 2;
+    public int ConnectionTimeoutSeconds { get; set; } = 30;
+    public int CommandTimeoutSeconds { get; set; } = 30;
+    public bool EnablePerformanceMonitoring { get; set; } = true;
+    public bool EnableQueryLogging { get; set; } = false;
 }
 ```
 
-## 📋 Detailed Setup Instructions
+## Security Features
 
-### Step 1: Install Prerequisites
+### ✅ **Connection Security**
 
-1. **Install .NET 8 SDK**
+- SSL/TLS encryption preferred
+- Parameter validation
+- SQL injection protection
+- Connection timeout limits
 
-   ```bash
-   # Windows (using winget)
-   winget install Microsoft.DotNet.SDK.8
+### ✅ **Resource Management**
 
-   # macOS (using brew)
-   brew install dotnet
+- Proper connection disposal
+- Semaphore-based thread safety
+- Memory-efficient result processing
+- Graceful error handling
 
-   # Or download from: https://dotnet.microsoft.com/download/dotnet/8.0
-   ```
+### ✅ **Query Safety**
 
-2. **Install Visual Studio Code**
+- Parameterized queries
+- Result size limits
+- Execution timeouts
+- Input validation
 
-   - Download from: https://code.visualstudio.com/
-   - Install GitHub Copilot extension
-   - Install GitHub Copilot Chat extension
+## Performance Features
 
-3. **Ensure MySQL Access**
-   - Have a MySQL database running
-   - Know the connection details (host, port, database, username, password)
+### ✅ **Optimized Operations**
 
-### Step 2: Project Setup
+- Connection pooling (min 2, max 20 connections)
+- Parallel database operations
+- Batch processing for large datasets
+- Efficient memory usage
 
-1. **Clone the Repository**
+### ✅ **Monitoring**
 
-   ```bash
-   git clone https://github.com/your-username/MsDbServer.git
-   cd MsDbServer
-   ```
+- Execution time tracking
+- Performance metrics
+- Structured logging
+- Resource usage monitoring
 
-2. **Configure Database Connection**
+## Usage Example
 
-   **Option A: Edit appsettings.json**
-
-   ```json
-   {
-     "ConnectionStrings": {
-       "DefaultConnection": "server=your_host;port=3306;database=your_db;user=your_user;password=your_password"
-     }
-   }
-   ```
-
-   **Option B: Use Environment Variables**
-
-   ```bash
-   # Windows
-   set ConnectionStrings__DefaultConnection=server=localhost;port=3306;database=your_db;user=your_user;password=your_password
-
-   # Linux/macOS
-   export ConnectionStrings__DefaultConnection="server=localhost;port=3306;database=your_db;user=your_user;password=your_password"
-   ```
-
-3. **Test the Connection**
-
-   ```bash
-   cd MsDbServer
-   dotnet build
-   dotnet run
-   ```
-
-   You should see:
-
-   ```
-   info: Database connection test successful. Starting MCP server...
-   ```
-
-### Step 3: VS Code Integration
-
-1. **Create MCP Configuration**
-
-   Create `.vscode/mcp.json` in your workspace:
-
-   ```json
-   {
-     "servers": {
-       "MsDbServer": {
-         "command": "dotnet",
-         "args": ["run", "--project", "MsDbServer/MsDbServer.csproj"],
-         "cwd": "${workspaceFolder}",
-         "env": {
-           "ConnectionStrings__DefaultConnection": "server=localhost;port=3306;database=your_database;user=your_user;password=your_password"
-         }
-       }
-     }
-   }
-   ```
-
-2. **Open Workspace in VS Code**
-
-   ```bash
-   code .
-   ```
-
-3. **Test with GitHub Copilot**
-   - Open GitHub Copilot Chat (Ctrl+Shift+I)
-   - Try: "List all tables in the database"
-   - Try: "Describe the users table"
-
-## 💻 Usage Examples
-
-### In GitHub Copilot Chat:
-
-```
-🗣️ List all tables in the database
-📋 Response: Shows all table names
-
-🗣️ Describe the users table structure
-📋 Response: Detailed schema with columns, types, constraints
-
-🗣️ Show me the first 5 records from the orders table
-📋 Response: Formatted table output
-
-🗣️ What are the foreign key relationships in my database?
-📋 Response: Visual relationship mapping
-
-🗣️ Get database statistics and table sizes
-📋 Response: Database overview with sizes and counts
-```
-
-### Manual Testing (JSON-RPC):
-
-```bash
-# List all tables
-echo '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"ListTables","arguments":{}}}' | dotnet run
-
-# Describe a table
-echo '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"DescribeTable","arguments":{"tableName":"users"}}}' | dotnet run
-```
-
-## 📁 Project Structure
-
-```
-MsDbServer/
-├── .vscode/
-│   └── mcp.json              # VS Code MCP configuration
-├── MsDbServer/
-│   ├── Program.cs            # Application entry point
-│   ├── DatabaseTools.cs     # 6 MCP tools implementation
-│   ├── IDatabaseService.cs  # Service interface & data models
-│   ├── MySqlDatabaseService.cs # MySQL implementation
-│   ├── appsettings.json     # Configuration
-│   └── MsDbServer.csproj    # Project file
-└── README.md                # This file
-```
-
-## 🛠️ Development
-
-### Building
-
-```bash
-cd MsDbServer
-dotnet build
-```
-
-### Running
-
-```bash
-cd MsDbServer
-dotnet run
-```
-
-### Testing Tools
-
-```bash
-# Test ListTables
-echo '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"ListTables","arguments":{}}}' | dotnet run
-
-# Test DescribeTable
-echo '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"DescribeTable","arguments":{"tableName":"your_table"}}}' | dotnet run
-```
-
-## 🔧 Troubleshooting
-
-### Common Issues
-
-1. **"Database connection test failed"**
-
-   - Check your connection string in `appsettings.json`
-   - Verify MySQL server is running
-   - Confirm database exists and credentials are correct
-
-2. **"GitHub Copilot doesn't see the MCP server"**
-
-   - Ensure `.vscode/mcp.json` exists in your workspace
-   - Restart VS Code after creating/editing MCP configuration
-   - Check that GitHub Copilot and Copilot Chat extensions are installed and active
-
-3. **"Build failed"**
-
-   - Ensure .NET 8 SDK is installed: `dotnet --version`
-   - Try: `dotnet restore` then `dotnet build`
-
-4. **"Permission denied" errors**
-   - Check file permissions
-   - On Linux/macOS, you might need: `chmod +x` on script files
-
-### Debug Mode
-
-```bash
-# Run with detailed logging
-dotnet run --configuration Debug
-```
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feature-name`
-3. Make your changes
-4. Test thoroughly
-5. Submit a pull request
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🙏 Acknowledgments
-
-- Built with the [Microsoft MCP SDK](https://github.com/microsoft/model-context-protocol)
-- Uses [MySql.Data](https://www.nuget.org/packages/MySql.Data/) for MySQL connectivity
-- Powered by [.NET 8](https://dotnet.microsoft.com/)
-
----
-
-**🚀 Ready to explore your database with AI? Clone, configure, and start asking questions!**
-
-- **Dependency Injection** - Proper service registration and lifetime management
-- **Async/Await** - All database operations are asynchronous
-- **Comprehensive Error Handling** - Proper error responses with meaningful messages
-- **Structured Logging** - Configurable logging with Microsoft.Extensions.Logging
-
-### 🗄️ Database Support
-
-- **MySQL** - Full support for MySQL database introspection
-- **Connection String Configuration** - Configurable via appsettings.json
-- **Safe Data Type Handling** - Handles MySQL-specific data types and large values
-
-## Quick Start
-
-### Prerequisites
-
-- .NET 8.0 SDK or later
-- MySQL database (configured and accessible)
-- Visual Studio Code with GitHub Copilot (for testing)
-
-### Installation
-
-1. Clone or download the project
-2. Configure your database connection in `appsettings.json`
-3. Build and run the server
-
-```bash
-dotnet build
-dotnet run
-```
-
-### Configuration
-
-Update `appsettings.json` with your MySQL connection string:
-
-```json
-{
-  "ConnectionStrings": {
-    "DefaultConnection": "server=localhost;port=3306;database=your_database;user=your_user;password=your_password"
-  }
-}
-```
-
-### VS Code Integration
-
-Create or update `.vscode/mcp.json` in your workspace:
-
-```json
-{
-  "inputs": [],
-  "servers": {
-    "MsDbServer": {
-      "type": "stdio",
-      "command": "dotnet",
-      "args": ["run", "--project", "path/to/MsDbServer.csproj"]
-    }
-  }
-}
-```
-
-## Usage Examples
-
-### Using with GitHub Copilot
-
-Once configured, you can use the tools in GitHub Copilot:
-
-- "List all tables in the database"
-- "Describe the structure of the users table"
-- "Show me the schema for the orders table"
-- "Get database statistics and table sizes"
-- "Execute a query to show the first 10 users"
-- "Show me all tables that start with 'user'"
-- "What are the foreign key relationships for the orders table?"
-
-### Direct JSON-RPC Testing
-
-```bash
-# List all tables
-echo '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"ListTables","arguments":{}}}' | dotnet run
-
-# Describe a specific table
-echo '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"DescribeTable","arguments":{"tableName":"users"}}}' | dotnet run
-
-# Execute a query
-echo '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"ExecuteQuery","arguments":{"query":"SELECT * FROM users LIMIT 5","maxRows":5}}}' | dotnet run
-
-# Get database statistics
-echo '{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"GetDatabaseStats","arguments":{}}}' | dotnet run
-
-# Get schema for tables starting with 'user'
-echo '{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"GetSchemaInfo","arguments":{"tablePattern":"user%"}}}' | dotnet run
-
-# Get relationships for a specific table
-echo '{"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"GetTableRelationships","arguments":{"tableName":"orders"}}}' | dotnet run
-```
-
-### PowerShell Testing
-
-Use the included test script:
+### Running the Server
 
 ```powershell
-.\test-mcp.ps1
+cd MCP-DbServer\MsDbServer
+dotnet run
 ```
 
-## Sample Output
+### MCP Client Integration
 
-### ListTables Response
+```typescript
+// Example client usage
+const client = await McpClientFactory.CreateAsync(transport);
 
-```
-Database Tables:
-================
-  addresses
-  orders
-  products
-  users
-```
+// Test connection with structured output
+const result = await client.CallToolAsync("test_connection", {});
+console.log(result.structuredContent); // JSON schema data
+console.log(result.content[0].text); // Human-readable text
 
-### DescribeTable Response
-
-```
-Table: default.users
-
-Columns:
---------
-  UserId bigint(19,0) NOT NULL IDENTITY PRIMARY KEY
-  Username varchar(50) NOT NULL
-  Email varchar(100) NULL
-  CreatedDate datetime NOT NULL
-    Default: CURRENT_TIMESTAMP
-
-Primary Keys:
--------------
-  UserId
-
-Foreign Keys:
--------------
-  (none)
-
-Indexes:
---------
-  IX_Users_Email: Email
-  IX_Users_Username: Username
+// Get table structure
+const tableInfo = await client.CallToolAsync("describe_table", {
+  tableName: "users",
+});
 ```
 
-### ExecuteQuery Response
+## Technology Stack
 
-```
-Query: SELECT UserId, Username, Email FROM users LIMIT 3
-Execution Time: 12.45ms
-Rows: 3
+- **.NET 8.0** - Latest .NET runtime
+- **ModelContextProtocol v0.3.0-preview.2** - Latest MCP SDK
+- **MySql.Data v9.3.0** - Latest MySQL connector
+- **Microsoft.Extensions.Hosting v9.0.6** - Modern hosting model
+- **Structured Logging** - Comprehensive logging framework
+- **Dependency Injection** - Full DI container support
 
------------------------------------------------------------------------
-UserId | Username     | Email
------------------------------------------------------------------------
-1      | john_doe     | john.doe@example.com
-2      | jane_smith   | jane.smith@example.com
-3      | bob_wilson   | bob.wilson@example.com
------------------------------------------------------------------------
-```
+## Key Improvements Made
 
-### GetDatabaseStats Response
+### 🔄 **From Legacy to Modern**
 
-```
-Database Statistics: rent_wizard
-================================
-Database Version: 8.0.35
-Generated At: 2025-06-27 10:30:15 UTC
+1. **Updated NuGet Packages** - Latest MCP SDK and dependencies
+2. **Refactored Database Service** - Modern async patterns and connection pooling
+3. **Enhanced Tools** - CallToolResult with structured output
+4. **Added Resource Links** - 2025-06-18 specification feature
+5. **Improved Error Handling** - Structured error responses
+6. **Security Hardening** - SSL connections and parameter validation
+7. **Performance Optimization** - Parallel processing and connection pooling
 
-Overview:
----------
-Total Tables: 6
-Database Size: 2.4MB
+### 🆕 **New Features Added**
 
-Table Statistics:
------------------
-Table Name               Rows   Data Size Index Size  Columns Indexes
-----------------------------------------------------------------------
-users                    1,250     125.6KB    45.2KB        8       3
-orders                     847      98.3KB    32.1KB       12       4
-products                   156      23.4KB    12.8KB        9       2
-addresses                  892      67.8KB    28.3KB        7       2
-owners                      45       8.2KB     3.1KB        6       1
-properties                 234      45.6KB    18.7KB       15       5
-```
+- **Structured Tool Output** - JSON schemas for all tool responses
+- **Resource Links** - Links to database resources and schemas
+- **Tool Metadata** - Rich metadata with structured information
+- **Connection Testing** - Comprehensive connection validation
+- **Performance Monitoring** - Execution time and resource tracking
+- **Modern Configuration** - Options pattern and dependency injection
 
-### GetTableRelationships Response
+## Development Notes
 
-```
-Table Relationships (8 found)
-=========================
+This implementation represents a fully modernized MCP server that:
 
-Parent Table: users
-Children:
-  orders.UserId -> users.UserId
-    Constraint: FK_orders_users
-  addresses.UserId -> users.UserId
-    Constraint: FK_addresses_users
+- Complies with the latest MCP 2025-06-18 specification
+- Uses modern C# patterns and best practices
+- Provides structured, LLM-friendly outputs
+- Implements comprehensive security measures
+- Delivers optimal performance for production use
 
-Parent Table: products
-Children:
-  order_items.ProductId -> products.ProductId
-    Constraint: FK_order_items_products
-
-Dependency Summary:
-------------------
-orders depends on: users
-addresses depends on: users
-order_items depends on: products, orders
-```
-
-## Project Structure
-
-```
-MsDbServer/
-├── Program.cs                  # Application entry point and MCP server setup
-├── IDatabaseService.cs         # Database service interface and models
-├── MySqlDatabaseService.cs     # MySQL database implementation
-├── DatabaseTools.cs           # MCP tools with [McpServerTool] attributes
-├── appsettings.json           # Configuration file
-└── MsDbServer.csproj          # Project file with dependencies
-```
-
-## Dependencies
-
-- **ModelContextProtocol** (0.3.0-preview.1) - Microsoft MCP SDK
-- **Microsoft.Extensions.Hosting** (9.0.6) - Hosting infrastructure
-- **MySql.Data** (9.3.0) - MySQL connectivity
-
-## Migration from Manual Implementation
-
-This project replaces a previous manual JSON-RPC implementation with the official Microsoft MCP SDK, providing:
-
-- **Simplified Development** - Attributes-based tool registration
-- **Better Integration** - Official SDK support and updates
-- **Reduced Boilerplate** - Automatic JSON-RPC handling
-- **Future-Proof** - Follows Microsoft's recommended patterns
-
-## License
-
-This project is built for educational and development purposes.
-
----
-
-_Built with ❤️ using .NET 8 and the Microsoft MCP SDK_
+The server is ready for production deployment and can serve as a reference implementation for other MCP servers using the latest specification features.
