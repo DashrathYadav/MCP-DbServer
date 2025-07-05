@@ -3,6 +3,8 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Hosting;
 using ModelContextProtocol.Server;
 using MsDbServer.Configuration;
 using MsDbServer.Transport;
@@ -12,7 +14,7 @@ using MsDbServer.Infrastructure.Factories;
 using MsDbServer.Infrastructure.HealthChecks;
 using McpOptions = MsDbServer.Configuration.McpServerOptions;
 
-var builder = Host.CreateApplicationBuilder(args);
+var builder = WebApplication.CreateBuilder(args);
 
 // Configure options from appsettings.json
 builder.Services.Configure<McpOptions>(builder.Configuration.GetSection(McpOptions.SectionName));
@@ -37,6 +39,13 @@ builder.Services.AddSingleton<DatabaseService>();
 
 // Configure health checks
 builder.Services.AddSingleton<DatabaseHealthCheck>();
+builder.Services.AddHealthChecks()
+    .AddCheck<DatabaseHealthCheck>("database");
+
+// Add ASP.NET Core services
+builder.Services.AddControllers();
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
 
 // Configure transport services
 builder.Services.AddSingleton<TransportManager>();
@@ -46,24 +55,57 @@ builder.Services.AddSingleton(provider => new HttpTransportProvider(
     config.Transport.Http));
 
 // Configure MCP server with tools
-builder.Services
-    .AddMcpServer()
-    .WithStdioServerTransport()
-    .WithToolsFromAssembly();
+var mcpBuilder = builder.Services.AddMcpServer();
 
-var host = builder.Build();
+// Add STDIO transport if enabled
+if (config.Transport.Stdio.Enabled)
+{
+    mcpBuilder.WithStdioServerTransport();
+}
+
+// Add tools from assembly
+mcpBuilder.WithToolsFromAssembly();
+
+var app = builder.Build();
+
+// Configure the HTTP request pipeline
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
+
+app.UseRouting();
+app.MapControllers();
+app.MapHealthChecks("/health");
+
+// Add API endpoints
+app.MapGet("/", () => "MCP Database Server is running!");
+app.MapGet("/status", (IServiceProvider services) => 
+{
+    var transportManager = services.GetRequiredService<TransportManager>();
+    var enabledTransports = transportManager.GetEnabledProviders().Select(p => p.Name).ToList();
+    
+    return new 
+    { 
+        Status = "Running", 
+        Transports = enabledTransports,
+        Environment = app.Environment.EnvironmentName,
+        Timestamp = DateTime.UtcNow 
+    };
+});
 
 // Configure transport manager
-var transportManager = host.Services.GetRequiredService<TransportManager>();
-var stdioProvider = host.Services.GetRequiredService<StdioTransportProvider>();
-var httpProvider = host.Services.GetRequiredService<HttpTransportProvider>();
+var transportManager = app.Services.GetRequiredService<TransportManager>();
+var stdioProvider = app.Services.GetRequiredService<StdioTransportProvider>();
+var httpProvider = app.Services.GetRequiredService<HttpTransportProvider>();
 
 transportManager.AddProvider(stdioProvider);
 transportManager.AddProvider(httpProvider);
 
 // Test database connection on startup
-var databaseService = host.Services.GetRequiredService<DatabaseService>();
-var logger = host.Services.GetRequiredService<ILogger<Program>>();
+var databaseService = app.Services.GetRequiredService<DatabaseService>();
+var logger = app.Services.GetRequiredService<ILogger<Program>>();
 
 try
 {
@@ -86,4 +128,4 @@ catch (Exception ex)
     return;
 }
 
-await host.RunAsync();
+await app.RunAsync();

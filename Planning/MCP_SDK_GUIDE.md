@@ -3,6 +3,7 @@
 ## 🔍 Latest MCP SDK Features (2025-06-18)
 
 ### **📦 Official Packages**
+
 ```xml
 <!-- Core MCP functionality -->
 <PackageReference Include="ModelContextProtocol" Version="0.3.0-preview.2" />
@@ -17,6 +18,7 @@
 ### **🚀 Key SDK Features to Use**
 
 #### **1. Multi-Transport Support**
+
 ```csharp
 // Modern approach - use official SDK transports
 builder.Services
@@ -27,6 +29,7 @@ builder.Services
 ```
 
 #### **2. Structured Tool Outputs (2025-06-18)**
+
 ```csharp
 return new CallToolResult
 {
@@ -37,6 +40,7 @@ return new CallToolResult
 ```
 
 #### **3. Resource Links (2025-06-18)**
+
 ```csharp
 content.Add(new ResourceLinkBlock
 {
@@ -49,6 +53,7 @@ content.Add(new ResourceLinkBlock
 ```
 
 #### **4. Tool Annotations**
+
 ```csharp
 [McpServerTool(Name = "tool_name", Title = "Human-Friendly Name")]
 [Description("Detailed description for LLMs")]
@@ -59,6 +64,7 @@ public static async Task<CallToolResult> ToolMethod(
 ### **🏗️ Modern Architecture Patterns**
 
 #### **1. ASP.NET Core Integration**
+
 ```csharp
 // Use WebApplicationBuilder for HTTP support
 var builder = WebApplication.CreateBuilder(args);
@@ -74,6 +80,7 @@ app.MapMcp();  // Map HTTP endpoints
 ```
 
 #### **2. Dependency Injection Integration**
+
 ```csharp
 // Register services with DI
 builder.Services.AddSingleton<IDatabaseService, MySqlDatabaseService>();
@@ -87,6 +94,7 @@ public static async Task<CallToolResult> MyTool(
 ```
 
 #### **3. Configuration Integration**
+
 ```csharp
 // Options pattern for configuration
 public class McpServerOptions
@@ -105,12 +113,14 @@ builder.Services.Configure<McpServerOptions>(
 ## 🎯 Implementation Strategy
 
 ### **✅ Use Official SDK Features**
+
 - **Transport Management**: Use `WithStdioServerTransport()` and `WithHttpTransport()`
 - **Tool Registration**: Use `WithToolsFromAssembly()`
 - **DI Integration**: Use built-in service injection
 - **Configuration**: Use ASP.NET Core configuration system
 
 ### **✅ Modern Patterns**
+
 - **WebApplicationBuilder**: For HTTP and cloud support
 - **Options Pattern**: For configuration management
 - **ILogger**: For structured logging
@@ -118,6 +128,7 @@ builder.Services.Configure<McpServerOptions>(
 - **CORS**: For web client support
 
 ### **❌ Avoid Custom Implementations**
+
 - **Don't**: Create custom transport protocols
 - **Don't**: Implement custom MCP message handling
 - **Don't**: Build custom configuration systems
@@ -128,24 +139,28 @@ builder.Services.Configure<McpServerOptions>(
 ## 📋 SDK Usage Checklist
 
 ### **Transport Layer**
+
 - [ ] Use `ModelContextProtocol.AspNetCore` for HTTP
 - [ ] Use `WithStdioServerTransport()` for STDIO
 - [ ] Use `WithHttpTransport()` for HTTP
 - [ ] Use `app.MapMcp()` for endpoint mapping
 
 ### **Tool Layer**
+
 - [ ] Use `[McpServerTool]` attributes
 - [ ] Use `CallToolResult` for responses
 - [ ] Use `StructuredContent` for JSON outputs
 - [ ] Use `ResourceLinkBlock` for resource links
 
 ### **Configuration Layer**
+
 - [ ] Use `WebApplicationBuilder`
 - [ ] Use `IConfiguration` and Options pattern
 - [ ] Use `builder.Services` for DI registration
 - [ ] Use `appsettings.json` for environment config
 
 ### **Logging Layer**
+
 - [ ] Use `ILogger<T>` throughout
 - [ ] Use structured logging with scopes
 - [ ] Use log levels appropriately
@@ -156,6 +171,7 @@ builder.Services.Configure<McpServerOptions>(
 ## 🔧 Modern Best Practices
 
 ### **1. Error Handling**
+
 ```csharp
 try
 {
@@ -177,6 +193,7 @@ catch (Exception ex)
 ```
 
 ### **2. Async Patterns**
+
 ```csharp
 // Always use async/await for I/O operations
 public static async Task<CallToolResult> DatabaseTool(
@@ -188,6 +205,7 @@ public static async Task<CallToolResult> DatabaseTool(
 ```
 
 ### **3. Cancellation Support**
+
 ```csharp
 public static async Task<CallToolResult> LongRunningTool(
     IDatabaseService database,
@@ -200,4 +218,4 @@ public static async Task<CallToolResult> LongRunningTool(
 
 ---
 
-*Reference this document when implementing MCP features to ensure we use official SDK capabilities instead of custom implementations.*
+_Reference this document when implementing MCP features to ensure we use official SDK capabilities instead of custom implementations._

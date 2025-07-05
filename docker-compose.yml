@@ -1,0 +1,172 @@
+version: "3.8"
+
+services:
+  # MySQL MCP Server Instance
+  mcp-mysql:
+    build: .
+    container_name: mcp-server-mysql
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_URLS=http://+:8080
+      - McpServer__Database__Provider=mysql
+      - McpServer__Database__ConnectionString=server=mysql-db;port=3306;database=app_db;user=mcpuser;password=mcppass123
+      - McpServer__Transport__Stdio__Enabled=false
+      - McpServer__Transport__Http__Enabled=true
+      - McpServer__Transport__Http__Port=8080
+      - McpServer__Logging__LogLevel=Information
+    ports:
+      - "8080:8080"
+    depends_on:
+      mysql-db:
+        condition: service_healthy
+    networks:
+      - mcp-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # PostgreSQL MCP Server Instance (Future)
+  mcp-postgresql:
+    build: .
+    container_name: mcp-server-postgresql
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_URLS=http://+:8081
+      - McpServer__Database__Provider=postgresql
+      - McpServer__Database__ConnectionString=Host=postgres-db;Port=5432;Database=app_db;Username=mcpuser;Password=mcppass123
+      - McpServer__Transport__Stdio__Enabled=false
+      - McpServer__Transport__Http__Enabled=true
+      - McpServer__Transport__Http__Port=8081
+      - McpServer__Logging__LogLevel=Information
+    ports:
+      - "8081:8081"
+    depends_on:
+      postgres-db:
+        condition: service_healthy
+    networks:
+      - mcp-network
+    restart: unless-stopped
+    profiles:
+      - postgresql # Only start when postgresql profile is active
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Development MCP Server (STDIO only)
+  mcp-dev:
+    build: .
+    container_name: mcp-server-dev
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - McpServer__Database__Provider=mysql
+      - McpServer__Database__ConnectionString=server=mysql-db;port=3306;database=dev_db;user=mcpuser;password=mcppass123
+      - McpServer__Transport__Stdio__Enabled=true
+      - McpServer__Transport__Http__Enabled=false
+      - McpServer__Logging__LogLevel=Debug
+    depends_on:
+      mysql-db:
+        condition: service_healthy
+    networks:
+      - mcp-network
+    restart: unless-stopped
+    profiles:
+      - development # Only start when development profile is active
+    stdin_open: true
+    tty: true
+
+  # MySQL Database
+  mysql-db:
+    image: mysql:8.0
+    container_name: mcp-mysql-db
+    environment:
+      - MYSQL_ROOT_PASSWORD=rootpass123
+      - MYSQL_DATABASE=app_db
+      - MYSQL_USER=mcpuser
+      - MYSQL_PASSWORD=mcppass123
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./docker/mysql/init:/docker-entrypoint-initdb.d
+    networks:
+      - mcp-network
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "mysqladmin",
+          "ping",
+          "-h",
+          "localhost",
+          "-u",
+          "mcpuser",
+          "-pmcppass123",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # PostgreSQL Database (Future)
+  postgres-db:
+    image: postgres:15
+    container_name: mcp-postgres-db
+    environment:
+      - POSTGRES_DB=app_db
+      - POSTGRES_USER=mcpuser
+      - POSTGRES_PASSWORD=mcppass123
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d
+    networks:
+      - mcp-network
+    restart: unless-stopped
+    profiles:
+      - postgresql # Only start when postgresql profile is active
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mcpuser -d app_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # Nginx Load Balancer (Optional)
+  nginx:
+    image: nginx:alpine
+    container_name: mcp-load-balancer
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./docker/nginx/ssl:/etc/nginx/ssl
+    depends_on:
+      - mcp-mysql
+    networks:
+      - mcp-network
+    restart: unless-stopped
+    profiles:
+      - loadbalancer # Only start when loadbalancer profile is active
+
+volumes:
+  mysql_data:
+    driver: local
+  postgres_data:
+    driver: local
+
+networks:
+  mcp-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

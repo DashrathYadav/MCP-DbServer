@@ -1,7 +1,9 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using ModelContextProtocol.Server;
+using McpOptions = MsDbServer.Configuration.McpServerOptions;
 
 namespace MsDbServer.Transport;
 
@@ -11,15 +13,17 @@ namespace MsDbServer.Transport;
 public class StdioTransportProvider : ITransportProvider
 {
     private readonly ILogger<StdioTransportProvider> _logger;
+    private readonly McpOptions _options;
 
-    public StdioTransportProvider(ILogger<StdioTransportProvider> logger)
+    public StdioTransportProvider(ILogger<StdioTransportProvider> logger, IOptions<McpOptions> options)
     {
         _logger = logger;
+        _options = options.Value;
     }
 
     public string Name => "STDIO";
 
-    public bool IsEnabled => true; // Always enabled for backward compatibility
+    public bool IsEnabled => _options.Transport.Stdio.Enabled;
 
     public void ConfigureServices(IServiceCollection services)
     {
