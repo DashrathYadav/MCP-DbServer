@@ -43,7 +43,6 @@ builder.Services.AddHealthChecks()
     .AddCheck<DatabaseHealthCheck>("database");
 
 // Add ASP.NET Core services
-builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
@@ -51,11 +50,29 @@ builder.Services.AddSwaggerGen();
 builder.Services.AddSingleton<TransportManager>();
 builder.Services.AddSingleton<StdioTransportProvider>();
 builder.Services.AddSingleton(provider => new HttpTransportProvider(
-    provider.GetRequiredService<ILogger<HttpTransportProvider>>(), 
+    provider.GetRequiredService<ILogger<HttpTransportProvider>>(),
     config.Transport.Http));
 
-// Configure MCP server with tools
-var mcpBuilder = builder.Services.AddMcpServer();
+// Configure MCP server with proper SDK setup
+var mcpBuilder = builder.Services.AddMcpServer(options =>
+{
+    options.ServerInfo = new ModelContextProtocol.Protocol.Implementation
+    {
+        Name = "Rent Wizard Database MCP Server",
+        Version = "1.0.0"
+    };
+    options.ServerInstructions = "MCP server providing database introspection tools for the rent_wizard MySQL database. Use the provided tools to explore database structure, query data, and analyze table relationships.";
+    options.ProtocolVersion = "2025-06-18"; // Use latest protocol version
+});
+
+// Add HTTP transport for automatic endpoint mapping
+if (config.Transport.Http.Enabled)
+{
+    mcpBuilder.WithHttpTransport(httpOptions =>
+    {
+        httpOptions.Stateless = false; // Enable stateful mode for better functionality
+    });
+}
 
 // Add STDIO transport if enabled
 if (config.Transport.Stdio.Enabled)
@@ -63,7 +80,7 @@ if (config.Transport.Stdio.Enabled)
     mcpBuilder.WithStdioServerTransport();
 }
 
-// Add tools from assembly
+// Add tools from assembly - this will automatically discover DatabaseTools
 mcpBuilder.WithToolsFromAssembly();
 
 var app = builder.Build();
@@ -76,22 +93,27 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseRouting();
-app.MapControllers();
 app.MapHealthChecks("/health");
+
+// Map MCP endpoints using official SDK - this replaces the custom McpController
+if (config.Transport.Http.Enabled)
+{
+    app.MapMcp(); // This automatically creates all MCP protocol endpoints
+}
 
 // Add API endpoints
 app.MapGet("/", () => "MCP Database Server is running!");
-app.MapGet("/status", (IServiceProvider services) => 
+app.MapGet("/status", (IServiceProvider services) =>
 {
     var transportManager = services.GetRequiredService<TransportManager>();
     var enabledTransports = transportManager.GetEnabledProviders().Select(p => p.Name).ToList();
-    
-    return new 
-    { 
-        Status = "Running", 
+
+    return new
+    {
+        Status = "Running",
         Transports = enabledTransports,
         Environment = app.Environment.EnvironmentName,
-        Timestamp = DateTime.UtcNow 
+        Timestamp = DateTime.UtcNow
     };
 });
 
@@ -110,17 +132,19 @@ var logger = app.Services.GetRequiredService<ILogger<Program>>();
 try
 {
     logger.LogInformation("Starting MCP Database Server with modern architecture");
-    logger.LogInformation("Enabled transports: {Transports}", 
+    logger.LogInformation("Enabled transports: {Transports}",
         string.Join(", ", transportManager.GetEnabledProviders().Select(p => p.Name)));
-    
+
     var connectionTest = await databaseService.TestConnectionAsync();
     if (!connectionTest)
     {
-        logger.LogError("Database connection test failed. Please check your connection string.");
-        return;
+        logger.LogWarning("Database connection test failed. Server will start anyway for testing MCP endpoints.");
+        logger.LogWarning("Database-related tools may not function correctly until connection is established.");
     }
-    
-    logger.LogInformation("Database connection test successful. Starting MCP server...");
+    else
+    {
+        logger.LogInformation("Database connection test successful. Starting MCP server...");
+    }
 }
 catch (Exception ex)
 {

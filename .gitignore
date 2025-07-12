@@ -89,3 +89,5 @@ TestResults/
 # Package files
 *.nupkg
 *.snupkg
+
+.fake

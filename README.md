@@ -1,804 +1,424 @@
-# Modern MCP Database Server - 2025-06-18 Specification
+# MCP Database Server
 
-## Overview
+A Model Context Protocol (MCP) server that provides seamless database operations for MySQL and Microsoft SQL Server databases. This server enables VS Code clients to interact with databases through natural language commands and provides comprehensive database management capabilities.
 
-This MySQL MCP (Model Context Protocol) server implements the latest **2025-06-18 MCP specification** with a modern clean architecture approach. It provides secure, efficient database introspection capabilities for LLMs with structured outputs, resource links, and multi-transport support.
+## 🚀 Quick Start Guide
 
-## 🌟 **Key Features**
+### Prerequisites
 
-### ✅ **MCP 2025-06-18 Compliance**
+- **.NET 8.0 SDK** or later
+- **Docker & Docker Compose** (for containerized databases)
+- **VS Code** with MCP client extension
+- **Local Database** (MySQL or MSSQL) or Docker for containerized setup
 
-- **ModelContextProtocol SDK v0.3.0-preview.2** - Latest C# SDK
-- **Structured Tool Output** - All tools return structured JSON content
-- **Resource Links** - Tools can return links to database resources
-- **Tool Title Fields** - Human-friendly display names for tools
-- **Comprehensive Metadata** - Rich tool metadata with annotations
-- **Modern Error Handling** - Structured error responses with `CallToolResult`
+---
 
-### ✅ **Clean Architecture Implementation**
+## 📖 Usage Guide
 
-- **Layered Design** - Transport, Presentation, Application, Domain, Infrastructure
-- **Dependency Injection** - Full DI container integration
-- **Repository Pattern** - Database abstraction layer
-- **Options Pattern** - Configurable service settings
-- **Multi-Transport Support** - STDIO and HTTP transports
+### Prerequisites
 
-### ✅ **Advanced Database Features**
+- **.NET 8.0 SDK** or later
+- **VS Code** with MCP client extension
+- **Database Server**: MySQL or MSSQL (local, Docker, or remote)
 
-- **Connection Pooling** - Optimized MySQL connection management
-- **Async/Await Patterns** - Non-blocking database operations
-- **Structured Logging** - Comprehensive logging with correlation IDs
-- **Performance Monitoring** - Query execution timing and metrics
-- **Security Hardening** - Parameter validation and secure connections
+---
 
-### ✅ **Multi-Transport Support**
+## 🗄️ Database Setup Options
 
-- **STDIO Transport** - Standard MCP transport for client integration
-- **HTTP Transport** - RESTful API with health checks and Swagger
-- **Extensible Design** - Easy to add WebSocket, gRPC, or custom transports
+**The MCP server connects to any accessible database - it doesn't matter how your database is deployed:**
 
-## Available Tools
+### Option 1: Local Database Installation
 
-### 1. **test_connection** - Database Connection Test
+- Install MySQL or SQL Server directly on your machine
+- Use standard connection strings with `localhost`
 
-- **Description**: Test database connection with structured output and resource links
-- **Features**:
-  - Connection validation
-  - Database statistics
-  - Resource links to schema and stats
-  - Structured JSON output
-- **Returns**: Connection status, database info, and resource links
+### Option 2: Docker Containers
 
-### 2. **describe_table** - Table Structure Analysis
+```bash
+# MySQL in Docker
+docker run -d --name mysql-db -p 3306:3306 \
+  -e MYSQL_ROOT_PASSWORD=your_password \
+  -e MYSQL_DATABASE=your_db \
+  mysql:8.0
 
-- **Description**: Get detailed table structure including columns, keys, and constraints
-- **Features**:
-  - Column information (types, constraints, defaults)
-  - Primary and foreign keys
-  - Index information
-  - Structured metadata
-- **Parameters**: `tableName` (required), `schemaName` (optional)
-
-### 3. **list_tables** - Database Table Listing
-
-- **Description**: Get all tables in the database
-- **Features**:
-  - Sorted table list
-  - Table count metadata
-  - Clean formatted output
-- **Returns**: List of all database tables
-
-### 4. **execute_query** - SQL Query Execution
-
-- **Description**: Execute SQL queries with result limits and timeout protection
-- **Features**:
-  - Query result limiting (default 100 rows)
-  - Execution time tracking
-  - Structured result format
-  - SQL injection protection
-- **Parameters**: `query` (required), `maxRows` (optional, default 100)
-
-### 5. **get_database_stats** - Database Statistics
-
-- **Description**: Comprehensive database statistics with structured output
-- **Features**:
-  - Table counts and sizes
-  - Database version information
-  - Performance metrics
-  - Structured JSON metadata
-- **Returns**: Complete database statistics
-
-### 6. **get_schema_info** - Schema Information
-
-- **Description**: Get detailed schema information for tables
-- **Features**:
-  - Pattern matching support (% wildcards)
-  - Complete table structures
-  - Relationship information
-  - Batch processing for performance
-- **Parameters**: `tablePattern` (optional, supports wildcards)
-
-### 7. **get_table_relationships** - Relationship Analysis
-
-- **Description**: Analyze foreign key relationships between tables
-- **Features**:
-  - Parent-child relationships
-  - Constraint information
-  - Dependency mapping
-  - Structured relationship data
-- **Parameters**: `tableName` (optional, filter by table)
-
-## Modern Architecture
-
-### Database Service Layer
-
-```csharp
-// Modern connection pooling and async patterns
-public class MySqlDatabaseService : IDatabaseService, IDisposable
-{
-    // Singleton connection with semaphore for thread safety
-    private readonly SemaphoreSlim _connectionSemaphore;
-    // Structured logging with scopes
-    private readonly ILogger<MySqlDatabaseService> _logger;
-    // Options pattern for configuration
-    private readonly McpDatabaseServiceOptions _options;
-}
+# MSSQL in Docker
+docker run -d --name mssql-db -p 1433:1433 \
+  -e SA_PASSWORD=your_password \
+  -e ACCEPT_EULA=Y \
+  mcr.microsoft.com/mssql/server:2022-latest
 ```
 
-### Tool Implementation
+### Option 3: Remote/Cloud Databases
 
-```csharp
-// Modern tool with structured output and resource links
-[McpServerTool(Name = "test_connection", Title = "Test Database Connection")]
-public static async Task<CallToolResult> TestConnection(IDatabaseService databaseService)
+- AWS RDS, Azure SQL Database, Google Cloud SQL
+- Any network-accessible database server
+- Update connection strings with appropriate host/port
+
+---
+
+## ⚙️ MCP Server Configuration
+
+### Local Development (STDIO Transport)
+
+**For MySQL:**
+
+```jsonc
+// .vscode/mcp.json
 {
-    // Structured content with JSON schema
-    var structuredData = JsonSerializer.SerializeToNode(new { ... });
-
-    // Resource links for additional context
-    content.Add(new ResourceLinkBlock
-    {
-        Type = "resource_link",
-        Uri = $"mysql://schema/{databaseName}",
-        Name = $"{databaseName}-schema",
-        Description = "Complete database schema",
-        MimeType = "application/sql"
-    });
-
-    return new CallToolResult
-    {
-        Content = content,
-        StructuredContent = structuredData,
-        Meta = metadata
-    };
-}
-```
-
-## Configuration
-
-### Quick Setup
-
-1. **Copy the example configuration:**
-
-   ```powershell
-   cd MCP-DbServer\MsDbServer
-   copy appsettings.json.example appsettings.json
-   ```
-
-2. **Update your database connection:**
-   Edit `appsettings.json` with your MySQL database details:
-
-### Database Configuration
-
-```json
-{
-  "ConnectionStrings": {
-    "DefaultConnection": "server=localhost;port=3306;database=your_db;user=root;password=your_password"
+  "servers": {
+    "database-server": {
+      "command": "dotnet",
+      "args": ["run", "--project", "MsDbServer"],
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "McpServer__Transport__Stdio__Enabled": "true",
+        "McpServer__Transport__Http__Enabled": "false",
+        "McpServer__Database__Provider": "mysql",
+        "McpServer__Database__ConnectionString": "Server=localhost;Port=3306;Database=your_db;Uid=root;Pwd=your_password;",
+        "McpServer__Logging__LogLevel": "Information"
+      }
+    }
   }
 }
 ```
 
-### Service Options
+**For MSSQL:**
 
-```csharp
-public class McpDatabaseServiceOptions
+```jsonc
+// .vscode/mcp.json
 {
-    public int MaxPoolSize { get; set; } = 20;
-    public int MinPoolSize { get; set; } = 2;
-    public int ConnectionTimeoutSeconds { get; set; } = 30;
-    public int CommandTimeoutSeconds { get; set; } = 30;
-    public bool EnablePerformanceMonitoring { get; set; } = true;
-    public bool EnableQueryLogging { get; set; } = false;
+  "servers": {
+    "database-server-mssql": {
+      "command": "dotnet",
+      "args": ["run", "--project", "MsDbServer"],
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "McpServer__Transport__Stdio__Enabled": "true",
+        "McpServer__Transport__Http__Enabled": "false",
+        "McpServer__Database__Provider": "mssql",
+        "McpServer__Database__ConnectionString": "Server=localhost,1433;Database=your_db;User Id=sa;Password=your_password;TrustServerCertificate=true;",
+        "McpServer__Logging__LogLevel": "Information"
+      }
+    }
+  }
 }
 ```
 
-## Security Features
+### Containerized MCP Server (HTTP Transport)
 
-### ✅ **Connection Security**
-
-- SSL/TLS encryption preferred
-- Parameter validation
-- SQL injection protection
-- Connection timeout limits
-
-### ✅ **Resource Management**
-
-- Proper connection disposal
-- Semaphore-based thread safety
-- Memory-efficient result processing
-- Graceful error handling
-
-### ✅ **Query Safety**
-
-- Parameterized queries
-- Result size limits
-- Execution timeouts
-- Input validation
-
-## Performance Features
-
-### ✅ **Optimized Operations**
-
-- Connection pooling (min 2, max 20 connections)
-- Parallel database operations
-- Batch processing for large datasets
-- Efficient memory usage
-
-### ✅ **Monitoring**
-
-- Execution time tracking
-- Performance metrics
-- Structured logging
-- Resource usage monitoring
-
-## Usage Example
-
-### Running the Server
-
-```powershell
-cd MCP-DbServer\MsDbServer
-dotnet run
-```
-
-### MCP Client Integration
-
-```typescript
-// Example client usage
-const client = await McpClientFactory.CreateAsync(transport);
-
-// Test connection with structured output
-const result = await client.CallToolAsync("test_connection", {});
-console.log(result.structuredContent); // JSON schema data
-console.log(result.content[0].text); // Human-readable text
-
-// Get table structure
-const tableInfo = await client.CallToolAsync("describe_table", {
-  tableName: "users",
-});
-```
-
-## 🐳 **Docker Deployment**
-
-### **Quick Start with Docker**
-
-The MCP Database Server is now **Docker-ready** with support for multiple deployment scenarios:
-
-#### **1. Single MySQL Instance**
+If you want to run the MCP server itself in a container:
 
 ```bash
-# Deploy MySQL MCP Server instance
-./scripts/deploy.ps1 mysql
+# Build MCP server image
+./start-mcp.sh build
 
-# Or using Docker Compose directly
-docker-compose up -d mcp-mysql mysql-db
+# Start MCP server with HTTP transport
+./start-mcp.sh http mysql    # or mssql
 ```
 
-Access the server at: `http://localhost:8080`
+Configure VS Code for HTTP transport:
 
-#### **2. Development Mode (STDIO)**
-
-```bash
-# Deploy development instance with STDIO transport
-./scripts/deploy.ps1 dev
-
-# Or using Docker Compose directly
-docker-compose --profile development up -d mcp-dev mysql-db
-```
-
-#### **3. Full Stack with Load Balancer**
-
-```bash
-# Deploy full stack with Nginx load balancer
-./scripts/deploy.ps1 full
-
-# Or using Docker Compose directly
-docker-compose --profile loadbalancer up -d
-```
-
-Access through load balancer at: `http://localhost`
-
-### **Docker Architecture**
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    Docker Environment                        │
-├─────────────────────────────────────────────────────────────┤
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐         │
-│  │ MCP Server  │  │ MCP Server  │  │    Nginx    │         │
-│  │   MySQL     │  │ PostgreSQL  │  │    Load     │         │
-│  │ Port: 8080  │  │ Port: 8081  │  │  Balancer   │         │
-│  └─────────────┘  └─────────────┘  └─────────────┘         │
-│         │                 │                 │              │
-│  ┌─────────────┐  ┌─────────────┐           │              │
-│  │   MySQL     │  │ PostgreSQL  │           │              │
-│  │  Database   │  │  Database   │           │              │
-│  │ Port: 3306  │  │ Port: 5432  │           │              │
-│  └─────────────┘  └─────────────┘           │              │
-│                                              │              │
-│  ┌─────────────────────────────────────────────────────────┤
-│  │              Docker Network: mcp-network                │
-│  └─────────────────────────────────────────────────────────┘
-└─────────────────────────────────────────────────────────────┘
-```
-
-### **Available Deployment Profiles**
-
-| Profile        | Description           | Ports      | Use Case                  |
-| -------------- | --------------------- | ---------- | ------------------------- |
-| `mysql`        | MySQL MCP Server      | 8080, 3306 | Production MySQL          |
-| `postgresql`   | PostgreSQL MCP Server | 8081, 5432 | Production PostgreSQL     |
-| `development`  | STDIO Development     | 3306       | Development/Testing       |
-| `loadbalancer` | Full Stack + Nginx    | 80, 443    | Multi-instance Production |
-
-### **Environment Variables**
-
-Each deployment scenario uses specific environment variables:
-
-```bash
-# MySQL Instance
-McpServer__Database__Provider=mysql
-McpServer__Database__ConnectionString=server=mysql-db;port=3306;database=app_db;user=mcpuser;password=mcppass123
-McpServer__Transport__Http__Enabled=true
-McpServer__Transport__Http__Port=8080
-
-# PostgreSQL Instance (Future)
-McpServer__Database__Provider=postgresql
-McpServer__Database__ConnectionString=Host=postgres-db;Port=5432;Database=app_db;Username=mcpuser;Password=mcppass123
-McpServer__Transport__Http__Enabled=true
-McpServer__Transport__Http__Port=8081
-
-# Development Instance
-McpServer__Database__Provider=mysql
-McpServer__Transport__Stdio__Enabled=true
-McpServer__Transport__Http__Enabled=false
-McpServer__Logging__LogLevel=Debug
-```
-
-## 📖 **User Manual**
-
-### **Installation & Setup**
-
-#### **Prerequisites**
-
-- **Docker** and **Docker Compose** installed
-- **PowerShell** (for deployment scripts on Windows)
-- **Bash** (for deployment scripts on Linux/Mac)
-
-#### **Step-by-Step Installation**
-
-1. **Clone the Repository**
-
-   ```bash
-   git clone <repository-url>
-   cd MCP-DbServer
-   ```
-
-2. **Choose Your Deployment Scenario**
-
-   **Option A: MySQL Production Instance**
-
-   ```bash
-   ./scripts/deploy.ps1 mysql
-   ```
-
-   **Option B: Development with STDIO**
-
-   ```bash
-   ./scripts/deploy.ps1 dev
-   ```
-
-   **Option C: Full Stack with Load Balancer**
-
-   ```bash
-   ./scripts/deploy.ps1 full
-   ```
-
-3. **Verify Deployment**
-
-   ```bash
-   # Check service status
-   ./scripts/deploy.ps1 status
-
-   # Check health endpoints
-   curl http://localhost:8080/health  # MySQL instance
-   curl http://localhost/health       # Load balancer
-   ```
-
-### **Using the MCP Database Server**
-
-#### **HTTP API Endpoints**
-
-The server provides RESTful endpoints for MCP operations:
-
-##### **Health Check**
-
-```bash
-GET /health
-```
-
-Returns server health status and database connectivity.
-
-##### **MCP Tool Listing**
-
-```bash
-POST /mcp/tools/list
-Content-Type: application/json
-
-{}
-```
-
-##### **MCP Tool Execution**
-
-```bash
-POST /mcp/tools/call
-Content-Type: application/json
-
+```jsonc
+// .vscode/mcp.json
 {
-  "name": "test_connection",
-  "arguments": {}
+  "servers": {
+    "database-server-http": {
+      "command": "curl",
+      "args": [
+        "-X",
+        "POST",
+        "http://localhost:8080/mcp",
+        "-H",
+        "Content-Type: application/json"
+      ],
+      "transport": "http"
+    }
+  }
 }
 ```
-
-##### **Example Tool Calls**
-
-**Test Database Connection**
-
-```bash
-curl -X POST http://localhost:8080/mcp/tools/call \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "test_connection",
-    "arguments": {}
-  }'
-```
-
-**List All Tables**
-
-```bash
-curl -X POST http://localhost:8080/mcp/tools/call \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "list_tables",
-    "arguments": {}
-  }'
-```
-
-**Execute SQL Query**
-
-```bash
-curl -X POST http://localhost:8080/mcp/tools/call \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "execute_query",
-    "arguments": {
-      "query": "SELECT * FROM users LIMIT 10"
-    }
-  }'
-```
-
-**Describe Table Structure**
-
-```bash
-curl -X POST http://localhost:8080/mcp/tools/call \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "describe_table",
-    "arguments": {
-      "tableName": "users"
-    }
-  }'
-```
-
-#### **STDIO Transport Usage**
-
-For development and direct client integration:
-
-```bash
-# Start development instance
-./scripts/deploy.ps1 dev
-
-# Connect to container
-docker exec -it mcp-server-dev /bin/bash
-
-# Server will respond to MCP protocol messages via STDIO
-```
-
-### **Configuration Management**
-
-#### **Database Configuration**
-
-Update database settings through environment variables:
-
-```bash
-# MySQL Configuration
-McpServer__Database__Provider=mysql
-McpServer__Database__ConnectionString=server=mysql-db;port=3306;database=app_db;user=mcpuser;password=mcppass123
-McpServer__Database__MaxPoolSize=20
-McpServer__Database__EnablePerformanceMonitoring=true
-
-# PostgreSQL Configuration (Future)
-McpServer__Database__Provider=postgresql
-McpServer__Database__ConnectionString=Host=postgres-db;Port=5432;Database=app_db;Username=mcpuser;Password=mcppass123
-```
-
-#### **Transport Configuration**
-
-Configure transport protocols:
-
-```bash
-# Enable HTTP transport
-McpServer__Transport__Http__Enabled=true
-McpServer__Transport__Http__Port=8080
-
-# Enable STDIO transport
-McpServer__Transport__Stdio__Enabled=true
-
-# Logging configuration
-McpServer__Logging__LogLevel=Information
-```
-
-### **Monitoring & Troubleshooting**
-
-#### **Monitoring Commands**
-
-```bash
-# Check service status
-./scripts/deploy.ps1 status
-
-# View logs
-./scripts/deploy.ps1 logs
-
-# View specific service logs
-docker-compose logs -f mcp-mysql
-docker-compose logs -f mysql-db
-```
-
-#### **Health Checks**
-
-```bash
-# Server health
-curl http://localhost:8080/health
-
-# Database connectivity
-curl -X POST http://localhost:8080/mcp/tools/call \
-  -H "Content-Type: application/json" \
-  -d '{"name": "test_connection", "arguments": {}}'
-```
-
-#### **Common Issues**
-
-**Issue: Container fails to start**
-
-```bash
-# Check logs
-docker-compose logs mcp-mysql
-
-# Common causes:
-# - Database connection string incorrect
-# - Database not ready (wait for health check)
-# - Port conflicts (change port in docker-compose.yml)
-```
-
-**Issue: Database connection failed**
-
-```bash
-# Check database status
-docker-compose logs mysql-db
-
-# Verify connectivity
-docker exec -it mcp-mysql-db mysql -u mcpuser -p
-
-# Check network connectivity
-docker exec -it mcp-server-mysql ping mysql-db
-```
-
-### **Scaling & Multi-Instance Deployment**
-
-#### **Horizontal Scaling**
-
-```bash
-# Scale MySQL instances
-docker-compose up -d --scale mcp-mysql=3
-
-# Use load balancer
-./scripts/deploy.ps1 full
-```
-
-#### **Multi-Database Deployment**
-
-```bash
-# Deploy MySQL and PostgreSQL instances
-docker-compose up -d mcp-mysql mysql-db
-docker-compose --profile postgresql up -d mcp-postgresql postgres-db
-```
-
-### **Production Deployment Checklist**
-
-- [ ] **Configure secure connection strings**
-- [ ] **Set up SSL/TLS certificates**
-- [ ] **Configure firewall rules**
-- [ ] **Set up monitoring and logging**
-- [ ] **Configure backup strategies**
-- [ ] **Test health check endpoints**
-- [ ] **Configure resource limits**
-- [ ] **Set up log rotation**
-- [ ] **Test disaster recovery procedures**
-
-### **Development Workflow**
-
-#### **Local Development**
-
-```bash
-# Start development environment
-./scripts/deploy.ps1 dev
-
-# Make changes to code
-# ...
-
-# Rebuild and restart
-./scripts/deploy.ps1 dev -Rebuild
-```
-
-#### **Testing**
-
-```bash
-# Test all endpoints
-curl http://localhost:8080/health
-curl -X POST http://localhost:8080/mcp/tools/list
-curl -X POST http://localhost:8080/mcp/tools/call -d '{"name":"test_connection","arguments":{}}'
-```
-
-### **Cleanup & Maintenance**
-
-#### **Stopping Services**
-
-```bash
-# Stop all services
-./scripts/deploy.ps1 stop
-
-# Stop specific profile
-docker-compose --profile development down
-```
-
-#### **Cleaning Up**
-
-```bash
-# Remove containers and volumes
-./scripts/deploy.ps1 clean
-
-# Remove unused images
-docker system prune -a
-```
-
-#### **Updating**
-
-```bash
-# Pull latest changes
-git pull origin main
-
-# Rebuild and restart
-./scripts/deploy.ps1 mysql -Rebuild
-```
-
-## Technology Stack
-
-### **Core Technologies**
-
-- **.NET 8.0** - Latest .NET runtime
-- **ModelContextProtocol v0.3.0-preview.2** - Latest MCP SDK
-- **MySql.Data v9.3.0** - Latest MySQL connector
-- **Microsoft.Extensions.Hosting v9.0.6** - Modern hosting model
-- **Structured Logging** - Comprehensive logging framework
-- **Dependency Injection** - Full DI container support
-
-### **Container Technologies**
-
-- **Docker** - Multi-stage containerization
-- **Docker Compose** - Multi-service orchestration
-- **Nginx** - Load balancing and reverse proxy
-- **MySQL 8.0** - Database container
-- **PostgreSQL 15** - Database container (future)
-
-### **Architecture Patterns**
-
-- **Clean Architecture** - Layered separation of concerns
-- **Repository Pattern** - Database abstraction
-- **Factory Pattern** - Database provider creation
-- **Options Pattern** - Configuration management
-- **Multi-Transport** - STDIO and HTTP support
-
-## Key Improvements Made
-
-### 🔄 **From Legacy to Modern**
-
-1. **Updated NuGet Packages** - Latest MCP SDK and dependencies
-2. **Refactored Database Service** - Modern async patterns and connection pooling
-3. **Enhanced Tools** - CallToolResult with structured output
-4. **Added Resource Links** - 2025-06-18 specification feature
-5. **Improved Error Handling** - Structured error responses
-6. **Security Hardening** - SSL connections and parameter validation
-7. **Performance Optimization** - Parallel processing and connection pooling
-8. **Clean Architecture** - Layered separation of concerns
-9. **Multi-Transport Support** - STDIO and HTTP protocols
-10. **Docker Containerization** - Production-ready deployment
-
-### 🆕 **New Features Added**
-
-- **Structured Tool Output** - JSON schemas for all tool responses
-- **Resource Links** - Links to database resources and schemas
-- **Tool Metadata** - Rich metadata with structured information
-- **Connection Testing** - Comprehensive connection validation
-- **Performance Monitoring** - Execution time and resource tracking
-- **Modern Configuration** - Options pattern and dependency injection
-- **Multi-Instance Deployment** - Docker-based scaling
-- **Load Balancing** - Nginx-based request distribution
-- **Health Checks** - Container and application health monitoring
-- **Environment Profiles** - Development, staging, and production configurations
-
-### 🐳 **Docker & DevOps Features**
-
-- **Multi-Stage Builds** - Optimized container images
-- **Security Hardening** - Non-root user, minimal attack surface
-- **Health Checks** - Container and application health monitoring
-- **Service Discovery** - Docker network-based service communication
-- **Environment Management** - Profile-based deployments
-- **Scaling Support** - Horizontal and vertical scaling capabilities
-- **Monitoring Integration** - Structured logging and metrics
-- **Deployment Scripts** - Automated deployment and management
-
-## Development Notes
-
-This implementation represents a **production-ready, Docker-enabled** MCP server that:
-
-- **Complies with MCP 2025-06-18 specification** - Latest features and best practices
-- **Uses modern C# patterns** - Clean architecture, dependency injection, async/await
-- **Provides structured, LLM-friendly outputs** - JSON schemas and resource links
-- **Implements comprehensive security** - SSL, parameter validation, non-root containers
-- **Delivers optimal performance** - Connection pooling, parallel processing, caching
-- **Supports multi-instance deployment** - Docker Compose, load balancing, scaling
-- **Enables easy configuration** - Environment variables, profiles, health checks
-- **Includes monitoring and observability** - Structured logging, health endpoints, metrics
-
-### **Deployment Scenarios**
-
-The server supports multiple deployment scenarios:
-
-1. **Development** - STDIO transport for direct client integration
-2. **Single Instance** - HTTP transport for API access
-3. **Multi-Instance** - Load-balanced deployment with multiple databases
-4. **Production** - Full stack with monitoring, security, and scaling
-
-### **Future Enhancements**
-
-- **Kubernetes Orchestration** - K8s manifests and Helm charts
-- **PostgreSQL Support** - Multi-database provider implementation
-- **Advanced Monitoring** - Prometheus, Grafana, distributed tracing
-- **Security Enhancements** - OAuth, JWT, API keys
-- **Performance Optimization** - Redis caching, query optimization
-- **CI/CD Integration** - GitHub Actions, automated testing
-
-The server is **ready for production deployment** and can serve as a **reference implementation** for modern MCP servers using the latest specification features with Docker containerization.
 
 ---
 
-## 🚀 **Quick Start Summary**
+## 🛠️ Management Commands
+
+### MCP Server Management
 
 ```bash
-# 1. Clone and navigate to project
-git clone <repository-url>
-cd MCP-DbServer
+# Check MCP server status
+./start-mcp.sh status
 
-# 2. Deploy MySQL instance
-./scripts/deploy.ps1 mysql
-
-# 3. Test the deployment
-curl http://localhost:8080/health
-curl -X POST http://localhost:8080/mcp/tools/list
-
-# 4. Use the MCP tools
-curl -X POST http://localhost:8080/mcp/tools/call \
-  -H "Content-Type: application/json" \
-  -d '{"name": "test_connection", "arguments": {}}'
+# Stop MCP servers
+./start-mcp.sh stop
 ```
 
-**Server is now running at** `http://localhost:8080` 🎉
+### Database Connection Examples
+
+**Local MySQL:**
+
+```
+Server=localhost;Port=3306;Database=mydb;Uid=root;Pwd=password123;
+```
+
+**Docker MySQL:**
+
+```
+Server=localhost;Port=3306;Database=mydb;Uid=root;Pwd=password123;
+```
+
+**Remote MySQL:**
+
+```
+Server=remote-host.com;Port=3306;Database=mydb;Uid=user;Pwd=password123;
+```
+
+**Local MSSQL:**
+
+```
+Server=localhost,1433;Database=mydb;User Id=sa;Password=password123;TrustServerCertificate=true;
+```
+
+**Docker MSSQL:**
+
+```
+Server=localhost,1433;Database=mydb;User Id=sa;Password=password123;TrustServerCertificate=true;
+```
+
+**Remote MSSQL:**
+
+```
+Server=remote-host.com,1433;Database=mydb;User Id=sa;Password=password123;TrustServerCertificate=true;
+```
+
+---
+
+## 🤖 AI-Powered Query Performance Analysis
+
+### New Tools for Database Optimization
+
+The MCP Database Server now includes advanced query analysis capabilities powered by AI to help you optimize database performance:
+
+#### **get_query_execution_plan**
+
+Get detailed execution plans with cost analysis and performance warnings:
+
+```bash
+# Example usage via HTTP API
+curl -X POST "http://localhost:8081/mcp/tools/call" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "tools/call",
+    "params": {
+      "name": "get_query_execution_plan",
+      "arguments": {
+        "query": "SELECT * FROM Users WHERE Email LIKE '\''%gmail%'\''"
+      }
+    }
+  }'
+```
+
+#### **analyze_query_performance**
+
+AI-powered analysis with optimization suggestions:
+
+```bash
+# Get AI-powered optimization suggestions
+curl -X POST "http://localhost:8081/mcp/tools/call" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": 2,
+    "method": "tools/call",
+    "params": {
+      "name": "analyze_query_performance",
+      "arguments": {
+        "query": "SELECT u.*, p.* FROM Users u LEFT JOIN Properties p ON u.UserId = p.OwnerId ORDER BY u.CreatedDate"
+      }
+    }
+  }'
+```
+
+### **What You Get:**
+
+- **🎯 Performance Rating**: Excellent, Good, Fair, or Poor
+- **💡 Smart Suggestions**: Index recommendations and query rewrites
+- **⚠️ Warning System**: Identify table scans, missing indexes, and bottlenecks
+- **📊 Cost Analysis**: Understand query execution costs
+- **🚀 Improvement Estimates**: Potential performance gains percentage
+- **🔧 Practical Fixes**: Specific SQL suggestions you can implement
+
+### **Demo Script**
+
+Run the included demo to see query analysis in action:
+
+```bash
+# Make sure your MCP server is running on port 8081
+./demo-query-analysis.sh
+```
+
+---
+
+## ✨ Features
+
+### **Database Operations**
+
+- **Multi-Database Support**: MySQL and Microsoft SQL Server
+- **Connection Testing**: Verify database connectivity
+- **Schema Discovery**: List databases, tables, columns, and relationships
+- **Query Execution**: Run SELECT, INSERT, UPDATE, DELETE statements
+- **Data Export**: Export table data to CSV format
+
+### **Database Analysis**
+
+- **Table Information**: Get detailed table structure and metadata
+- **Relationship Mapping**: Discover foreign key relationships
+- **Data Statistics**: Row counts and basic table analytics
+- **Schema Exploration**: Navigate database structure
+
+### **🚀 Query Performance Analysis** _(NEW)_
+
+- **Execution Plans**: Get detailed query execution plans with cost analysis
+- **AI-Powered Optimization**: Intelligent suggestions for query improvements
+- **Performance Rating**: Automated performance assessment (Excellent/Good/Fair/Poor)
+- **Index Recommendations**: Smart index suggestions based on query patterns
+- **Query Rewriting**: AI-generated suggestions for better query structure
+- **Warning System**: Identify performance bottlenecks and inefficient operations
+- **Cost Analysis**: Estimate query execution costs and resource usage
+- **Multi-Database Support**: Works with both MySQL EXPLAIN and SQL Server execution plans
+
+### **Transport Modes**
+
+- **STDIO Transport**: Direct process communication for local development
+- **HTTP Transport**: REST API endpoints for web-based integrations
+- **Container Support**: Dockerized deployment options
+
+### **Developer Experience**
+
+- **VS Code Integration**: Seamless MCP client support
+- **Natural Language**: Interact with databases using conversational commands
+- **Error Handling**: Comprehensive error reporting and debugging
+- **Logging**: Configurable logging levels for troubleshooting
+
+### **Security & Performance**
+
+- **Connection Pooling**: Efficient database connection management
+- **Parameterized Queries**: SQL injection protection
+- **Timeout Handling**: Configurable query timeouts
+- **Resource Management**: Automatic connection cleanup
+
+---
+
+## 🏗️ Project Structure
+
+```
+MCP-DbServer/
+├── MsDbServer/                          # Main MCP Server Project
+│   ├── Program.cs                       # Application entry point
+│   ├── Application/Services/            # Business logic layer
+│   ├── Domain/                          # Domain models and interfaces
+│   │   ├── Interfaces/                  # Repository contracts
+│   │   └── Models/                      # Data models
+│   ├── Infrastructure/                  # Data access layer
+│   │   ├── Repositories/                # Database implementations
+│   │   ├── Factories/                   # Repository factories
+│   │   └── HealthChecks/               # Health monitoring
+│   ├── Presentation/Tools/              # MCP tool definitions
+│   └── Transport/                       # Communication protocols
+├── docker/                              # Docker configurations
+│   ├── mysql/init/                      # MySQL initialization
+│   └── mssql/init/                      # MSSQL initialization
+├── start-mcp.sh                        # MCP server management script
+├── docker-compose.yml                   # Multi-database setup
+├── docker-compose.mssql.yml            # MSSQL-specific setup
+└── .vscode/mcp.json                     # VS Code MCP configuration
+```
+
+---
+
+## 🔧 Configuration
+
+### Environment Variables
+
+| Variable                                | Description            | Example                           |
+| --------------------------------------- | ---------------------- | --------------------------------- |
+| `McpServer__Database__Provider`         | Database type          | `mysql` or `mssql`                |
+| `McpServer__Database__ConnectionString` | Database connection    | See examples above                |
+| `McpServer__Transport__Stdio__Enabled`  | Enable STDIO transport | `true` or `false`                 |
+| `McpServer__Transport__Http__Enabled`   | Enable HTTP transport  | `true` or `false`                 |
+| `McpServer__Transport__Http__Port`      | HTTP server port       | `8080`                            |
+| `McpServer__Logging__LogLevel`          | Logging verbosity      | `Information`, `Debug`, `Warning` |
+
+### Connection String Formats
+
+**MySQL:**
+
+```
+Server=localhost;Port=3306;Database=dbname;Uid=username;Pwd=password;
+```
+
+**MSSQL:**
+
+```
+Server=localhost,1433;Database=dbname;User Id=username;Password=password;TrustServerCertificate=true;
+```
+
+---
+
+## 📋 Requirements
+
+### System Requirements
+
+- .NET 8.0 SDK
+- 4GB RAM minimum
+- Docker 20.0+ (for containerized setup)
+
+### Database Requirements
+
+- **MySQL**: 8.0 or later
+- **MSSQL**: SQL Server 2019 or later (including SQL Server Express)
+
+---
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feature/your-feature`
+3. Make your changes
+4. Test thoroughly
+5. Submit a pull request
+
+---
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+---
+
+## 🆘 Troubleshooting
+
+### Common Issues
+
+**Connection Failed:**
+
+- Verify database server is running and accessible
+- Check connection string format and credentials
+- Test network connectivity: `telnet host port`
+- For Docker: ensure ports are exposed correctly
+
+**MCP Server Not Starting:**
+
+- Check .NET SDK installation
+- Verify project builds: `dotnet build MsDbServer`
+- Check VS Code MCP configuration
+- Review log output for errors
+
+**Docker Issues:**
+
+- Ensure Docker daemon is running
+- Check container status: `docker ps`
+- Review container logs: `docker logs [container-name]`
+- Verify port availability
+
+For more detailed troubleshooting, check the [TECHNICAL_DOCUMENTATION.md](TECHNICAL_DOCUMENTATION.md) file.

@@ -1,5 +1,3 @@
-version: "3.8"
-
 services:
   # MySQL MCP Server Instance
   mcp-mysql:
@@ -29,21 +27,51 @@ services:
       retries: 3
       start_period: 40s
 
-  # PostgreSQL MCP Server Instance (Future)
-  mcp-postgresql:
+  # MSSQL MCP Server Instance
+  mcp-mssql:
     build: .
-    container_name: mcp-server-postgresql
+    container_name: mcp-server-mssql
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
       - ASPNETCORE_URLS=http://+:8081
-      - McpServer__Database__Provider=postgresql
-      - McpServer__Database__ConnectionString=Host=postgres-db;Port=5432;Database=app_db;Username=mcpuser;Password=mcppass123
+      - McpServer__Database__Provider=mssql
+      - McpServer__Database__ConnectionString=Server=mssql-db,1433;Database=app_db;User Id=sa;Password=Temp@123;TrustServerCertificate=true;
       - McpServer__Transport__Stdio__Enabled=false
       - McpServer__Transport__Http__Enabled=true
       - McpServer__Transport__Http__Port=8081
       - McpServer__Logging__LogLevel=Information
     ports:
       - "8081:8081"
+    depends_on:
+      mssql-db:
+        condition: service_healthy
+    networks:
+      - mcp-network
+    restart: unless-stopped
+    profiles:
+      - mssql # Only start when mssql profile is active
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # PostgreSQL MCP Server Instance (Future)
+  mcp-postgresql:
+    build: .
+    container_name: mcp-server-postgresql
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_URLS=http://+:8082
+      - McpServer__Database__Provider=postgresql
+      - McpServer__Database__ConnectionString=Host=postgres-db;Port=5432;Database=app_db;Username=mcpuser;Password=mcppass123
+      - McpServer__Transport__Stdio__Enabled=false
+      - McpServer__Transport__Http__Enabled=true
+      - McpServer__Transport__Http__Port=8082
+      - McpServer__Logging__LogLevel=Information
+    ports:
+      - "8082:8082"
     depends_on:
       postgres-db:
         condition: service_healthy
@@ -53,7 +81,7 @@ services:
     profiles:
       - postgresql # Only start when postgresql profile is active
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8082/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -115,6 +143,31 @@ services:
       retries: 5
       start_period: 30s
 
+  # MSSQL Database
+  mssql-db:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: mcp-mssql-db
+    environment:
+      - ACCEPT_EULA=Y
+      - SA_PASSWORD=Temp@123
+      - MSSQL_DB=app_db
+    ports:
+      - "1433:1433"
+    volumes:
+      - mssql_data:/var/opt/mssql
+      - ./docker/mssql/init:/docker-entrypoint-initdb.d
+    networks:
+      - mcp-network
+    restart: unless-stopped
+    profiles:
+      - mssql # Only start when mssql profile is active
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P Temp@123 -Q 'SELECT 1' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+
   # PostgreSQL Database (Future)
   postgres-db:
     image: postgres:15
@@ -160,6 +213,8 @@ services:
 
 volumes:
   mysql_data:
+    driver: local
+  mssql_data:
     driver: local
   postgres_data:
     driver: local

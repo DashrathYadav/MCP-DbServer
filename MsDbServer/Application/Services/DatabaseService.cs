@@ -143,19 +143,65 @@ public class DatabaseService
     {
         try
         {
-            _logger.LogInformation("Exporting table to CSV: {Schema}.{Table} (Limit: {Limit})", 
+            _logger.LogInformation("Exporting table to CSV: {Schema}.{Table} (Limit: {Limit})",
                 schema ?? "default", tableName, limit?.ToString() ?? "unlimited");
-            
+
             var csv = await _repository.ExportToCsvAsync(tableName, schema, limit, cancellationToken);
-            
-            _logger.LogInformation("Successfully exported table to CSV: {Schema}.{Table}", 
+
+            _logger.LogInformation("Successfully exported table to CSV: {Schema}.{Table}",
                 schema ?? "default", tableName);
-            
+
             return csv;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error exporting table to CSV: {Schema}.{Table}", schema, tableName);
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Get query execution plan with performance analysis
+    /// </summary>
+    public async Task<ExecutionPlan> GetExecutionPlanAsync(string query, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            _logger.LogInformation("Getting execution plan for query: {Query}", query.Length > 100 ? query.Substring(0, 100) + "..." : query);
+
+            var plan = await _repository.GetExecutionPlanAsync(query, cancellationToken);
+
+            _logger.LogInformation("Successfully generated execution plan. Cost: {Cost}, Rows: {Rows}",
+                plan.EstimatedCost, plan.EstimatedRows);
+
+            return plan;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting execution plan for query");
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Analyze query performance with AI-powered optimization suggestions
+    /// </summary>
+    public async Task<QueryAnalysis> AnalyzeQueryPerformanceAsync(string query, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            _logger.LogInformation("Analyzing query performance: {Query}", query.Length > 100 ? query.Substring(0, 100) + "..." : query);
+
+            var analysis = await _repository.AnalyzeQueryPerformanceAsync(query, cancellationToken);
+
+            _logger.LogInformation("Query analysis completed. Rating: {Rating}, Issues: {IssueCount}, Potential Improvement: {Improvement}%",
+                analysis.PerformanceRating, analysis.Issues.Count, analysis.PotentialImprovement);
+
+            return analysis;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error analyzing query performance");
             throw;
         }
     }

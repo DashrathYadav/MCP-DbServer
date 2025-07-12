@@ -21,14 +21,14 @@ public class DatabaseRepositoryFactory : IDatabaseRepositoryFactory
         return provider.ToLowerInvariant() switch
         {
             "mysql" => new MySqlDatabaseRepository(connectionString, _loggerFactory.CreateLogger<MySqlDatabaseRepository>()),
+            "mssql" or "sqlserver" => new SqlServerDatabaseRepository(connectionString, _loggerFactory.CreateLogger<SqlServerDatabaseRepository>()),
             "postgresql" => throw new NotImplementedException("PostgreSQL support will be added in Phase 3"),
-            "sqlserver" => throw new NotImplementedException("SQL Server support will be added in Phase 3"),
             _ => throw new ArgumentException($"Unsupported database provider: {provider}", nameof(provider))
         };
     }
 
     public IEnumerable<string> GetSupportedProviders()
     {
-        return new[] { "mysql" };
+        return new[] { "mysql", "mssql", "sqlserver" };
     }
 }

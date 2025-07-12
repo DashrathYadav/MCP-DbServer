@@ -51,6 +51,16 @@ public interface IDatabaseRepository
     /// Export table data as CSV
     /// </summary>
     Task<string> ExportToCsvAsync(string tableName, string? schema = null, int? limit = null, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Get query execution plan
+    /// </summary>
+    Task<ExecutionPlan> GetExecutionPlanAsync(string query, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Analyze query performance and provide optimization suggestions
+    /// </summary>
+    Task<QueryAnalysis> AnalyzeQueryPerformanceAsync(string query, CancellationToken cancellationToken = default);
 }
 
 /// <summary>

@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Text;
 using ModelContextProtocol.Server;
+using ModelContextProtocol; // Add this for McpException
 using Microsoft.Extensions.Logging;
 using MsDbServer.Application.Services;
 
@@ -23,20 +24,32 @@ public static class DatabaseTools
         [Description("Name of the table to describe")] string tableName,
         [Description("Schema name (optional, defaults to 'default')")] string? schemaName = null)
     {
-        if (string.IsNullOrWhiteSpace(tableName))
+        try
         {
-            throw new ArgumentException("Table name cannot be empty", nameof(tableName));
-        }
+            if (string.IsNullOrWhiteSpace(tableName))
+            {
+                throw new McpException("Table name cannot be empty", McpErrorCode.InvalidParams);
+            }
 
-        logger.LogInformation("Describing table: {Schema}.{Table}", schemaName ?? "default", tableName);
-        
-        var tableInfo = await databaseService.GetTableInfoAsync(tableName, schemaName);
-        if (tableInfo == null)
+            logger.LogInformation("Describing table: {Schema}.{Table}", schemaName ?? "default", tableName);
+
+            var tableInfo = await databaseService.GetTableInfoAsync(tableName, schemaName);
+            if (tableInfo == null)
+            {
+                throw new McpException($"Table '{tableName}' not found in schema '{schemaName ?? "default"}'", McpErrorCode.InvalidParams);
+            }
+
+            return FormatTableDescription(tableInfo);
+        }
+        catch (McpException)
         {
-            throw new InvalidOperationException($"Table '{tableName}' not found");
+            throw; // Re-throw MCP exceptions as-is
         }
-
-        return FormatTableDescription(tableInfo);
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error describing table {Table}", tableName);
+            throw new McpException($"Database error: {ex.Message}", McpErrorCode.InternalError);
+        }
     }
 
     /// <summary>
@@ -49,10 +62,18 @@ public static class DatabaseTools
         ILogger<DatabaseService> logger,
         [Description("Schema name (optional, lists all if not specified)")] string? schemaName = null)
     {
-        logger.LogInformation("Listing tables for schema: {Schema}", schemaName ?? "all");
-        
-        var tables = await databaseService.GetTablesAsync(schemaName);
-        return FormatTableList(tables);
+        try
+        {
+            logger.LogInformation("Listing tables for schema: {Schema}", schemaName ?? "all");
+
+            var tables = await databaseService.GetTablesAsync(schemaName);
+            return FormatTableList(tables);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error listing tables for schema {Schema}", schemaName);
+            throw new McpException($"Database error: {ex.Message}", McpErrorCode.InternalError);
+        }
     }
 
     /// <summary>
@@ -66,21 +87,38 @@ public static class DatabaseTools
         [Description("SQL query to execute")] string query,
         [Description("Maximum number of rows to return (default: 100)")] int maxRows = 100)
     {
-        if (string.IsNullOrWhiteSpace(query))
+        try
         {
-            throw new ArgumentException("Query cannot be empty", nameof(query));
-        }
+            if (string.IsNullOrWhiteSpace(query))
+            {
+                throw new McpException("Query cannot be empty", McpErrorCode.InvalidParams);
+            }
 
-        logger.LogInformation("Executing query with max rows: {MaxRows}", maxRows);
-        
-        var result = await databaseService.ExecuteQueryAsync(query);
-        
-        if (!result.Success)
+            if (maxRows <= 0 || maxRows > 10000)
+            {
+                throw new McpException("Max rows must be between 1 and 10000", McpErrorCode.InvalidParams);
+            }
+
+            logger.LogInformation("Executing query with max rows: {MaxRows}", maxRows);
+
+            var result = await databaseService.ExecuteQueryAsync(query);
+
+            if (!result.Success)
+            {
+                throw new McpException($"Query failed: {result.ErrorMessage}", McpErrorCode.InvalidRequest);
+            }
+
+            return FormatQueryResult(result, maxRows);
+        }
+        catch (McpException)
         {
-            throw new InvalidOperationException($"Query failed: {result.ErrorMessage}");
+            throw; // Re-throw MCP exceptions as-is
         }
-
-        return FormatQueryResult(result, maxRows);
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error executing query");
+            throw new McpException($"Database error: {ex.Message}", McpErrorCode.InternalError);
+        }
     }
 
     /// <summary>
@@ -92,10 +130,18 @@ public static class DatabaseTools
         DatabaseService databaseService,
         ILogger<DatabaseService> logger)
     {
-        logger.LogInformation("Listing database schemas");
-        
-        var schemas = await databaseService.GetSchemasAsync();
-        return FormatSchemaList(schemas);
+        try
+        {
+            logger.LogInformation("Listing database schemas");
+
+            var schemas = await databaseService.GetSchemasAsync();
+            return FormatSchemaList(schemas);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error listing schemas");
+            throw new McpException($"Database error: {ex.Message}", McpErrorCode.InternalError);
+        }
     }
 
     /// <summary>
@@ -115,9 +161,9 @@ public static class DatabaseTools
             throw new ArgumentException("Table name cannot be empty", nameof(tableName));
         }
 
-        logger.LogInformation("Exporting table to CSV: {Schema}.{Table} (Limit: {Limit})", 
+        logger.LogInformation("Exporting table to CSV: {Schema}.{Table} (Limit: {Limit})",
             schemaName ?? "default", tableName, limit);
-        
+
         return await databaseService.ExportToCsvAsync(tableName, schemaName, limit);
     }
 
@@ -131,9 +177,203 @@ public static class DatabaseTools
         ILogger<DatabaseService> logger)
     {
         logger.LogInformation("Testing database connection");
-        
+
         var isConnected = await databaseService.TestConnectionAsync();
         return isConnected ? "Database connection successful" : "Database connection failed";
+    }
+
+    /// <summary>
+    /// Analyze database structure and generate comprehensive report with progress tracking
+    /// </summary>
+    [McpServerTool(Name = "analyze_database", Title = "Analyze Database Structure")]
+    [Description("Perform comprehensive analysis of database structure including table relationships, data distribution, and schema overview. Shows progress during analysis.")]
+    public static async Task<string> AnalyzeDatabaseWithProgress(
+        DatabaseService databaseService,
+        ILogger<DatabaseService> logger,
+        IProgress<ProgressNotificationValue> progress,
+        [Description("Include detailed statistics (default: false)")] bool includeStats = false,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var sb = new StringBuilder();
+            sb.AppendLine("=== Database Structure Analysis ===");
+            sb.AppendLine($"Analysis started at: {DateTime.UtcNow:yyyy-MM-dd HH:mm:ss} UTC");
+            sb.AppendLine();
+
+            // Step 1: Get schemas
+            progress?.Report(new ProgressNotificationValue
+            {
+                Progress = 10,
+                Message = "Analyzing schemas..."
+            });
+            await Task.Delay(500, cancellationToken); // Simulate work
+
+            var schemas = await databaseService.GetSchemasAsync();
+            sb.AppendLine($"Found {schemas.Count()} schema(s):");
+            foreach (var schema in schemas)
+            {
+                sb.AppendLine($"  - {schema.Name}");
+            }
+            sb.AppendLine();
+
+            // Step 2: Get all tables
+            progress?.Report(new ProgressNotificationValue
+            {
+                Progress = 30,
+                Message = "Discovering tables..."
+            });
+            await Task.Delay(500, cancellationToken);
+
+            var allTables = await databaseService.GetTablesAsync();
+            sb.AppendLine($"Found {allTables.Count()} table(s) total:");
+
+            var tablesBySchema = allTables.GroupBy(t => t.Schema).OrderBy(g => g.Key);
+            foreach (var schemaGroup in tablesBySchema)
+            {
+                sb.AppendLine($"  {schemaGroup.Key}: {schemaGroup.Count()} tables");
+            }
+            sb.AppendLine();
+
+            // Step 3: Analyze table relationships
+            progress?.Report(new ProgressNotificationValue
+            {
+                Progress = 60,
+                Message = "Analyzing relationships..."
+            });
+            await Task.Delay(500, cancellationToken);
+
+            var tablesWithForeignKeys = allTables.Where(t => t.ForeignKeys.Any()).ToList();
+            sb.AppendLine($"Tables with foreign key relationships: {tablesWithForeignKeys.Count}");
+
+            if (tablesWithForeignKeys.Any())
+            {
+                sb.AppendLine("Key relationships:");
+                foreach (var table in tablesWithForeignKeys.Take(10)) // Limit for readability
+                {
+                    foreach (var fk in table.ForeignKeys)
+                    {
+                        sb.AppendLine($"  {table.Schema}.{table.Name}.{fk.Column} → {fk.ReferencedSchema}.{fk.ReferencedTable}.{fk.ReferencedColumn}");
+                    }
+                }
+                if (tablesWithForeignKeys.Count > 10)
+                {
+                    sb.AppendLine($"  ... and {tablesWithForeignKeys.Count - 10} more relationships");
+                }
+            }
+            sb.AppendLine();
+
+            // Step 4: Optional detailed statistics
+            if (includeStats)
+            {
+                progress?.Report(new ProgressNotificationValue
+                {
+                    Progress = 80,
+                    Message = "Calculating statistics..."
+                });
+                await Task.Delay(500, cancellationToken);
+
+                sb.AppendLine("=== Table Statistics ===");
+                var totalRows = allTables.Sum(t => t.RowCount);
+                sb.AppendLine($"Total rows across all tables: {totalRows:N0}");
+
+                var largestTables = allTables.OrderByDescending(t => t.RowCount).Take(5);
+                sb.AppendLine("Largest tables:");
+                foreach (var table in largestTables)
+                {
+                    sb.AppendLine($"  {table.Schema}.{table.Name}: {table.RowCount:N0} rows");
+                }
+                sb.AppendLine();
+            }
+
+            progress?.Report(new ProgressNotificationValue
+            {
+                Progress = 100,
+                Message = "Analysis complete"
+            });
+
+            sb.AppendLine($"Analysis completed at: {DateTime.UtcNow:yyyy-MM-dd HH:mm:ss} UTC");
+
+            logger.LogInformation("Database analysis completed with {TableCount} tables", allTables.Count());
+
+            return sb.ToString();
+        }
+        catch (OperationCanceledException)
+        {
+            logger.LogInformation("Database analysis was cancelled");
+            throw new McpException("Database analysis was cancelled", McpErrorCode.InvalidRequest);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error during database analysis");
+            throw new McpException($"Analysis failed: {ex.Message}", McpErrorCode.InternalError);
+        }
+    }
+
+    /// <summary>
+    /// Get query execution plan
+    /// </summary>
+    [McpServerTool(Name = "get_query_execution_plan", Title = "Get Query Execution Plan")]
+    [Description("Get the execution plan for a SQL query to understand how the database will execute it. Provides cost estimates, row counts, and performance warnings.")]
+    public static async Task<string> GetQueryExecutionPlan(
+        DatabaseService databaseService,
+        ILogger<DatabaseService> logger,
+        [Description("SQL query to get the execution plan for")] string query)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(query))
+            {
+                throw new McpException("Query cannot be empty", McpErrorCode.InvalidParams);
+            }
+
+            logger.LogInformation("Getting execution plan for query");
+
+            var plan = await databaseService.GetExecutionPlanAsync(query);
+            return FormatExecutionPlan(plan);
+        }
+        catch (McpException)
+        {
+            throw; // Re-throw MCP exceptions as-is
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error getting execution plan");
+            throw new McpException($"Database error: {ex.Message}", McpErrorCode.InternalError);
+        }
+    }
+
+    /// <summary>
+    /// Analyze query performance with AI-powered optimization suggestions
+    /// </summary>
+    [McpServerTool(Name = "analyze_query_performance", Title = "Analyze Query Performance")]
+    [Description("AI-powered analysis of SQL query performance with optimization suggestions, index recommendations, and query rewrite suggestions.")]
+    public static async Task<string> AnalyzeQueryPerformance(
+        DatabaseService databaseService,
+        ILogger<DatabaseService> logger,
+        [Description("SQL query to analyze for performance optimization")] string query)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(query))
+            {
+                throw new McpException("Query cannot be empty", McpErrorCode.InvalidParams);
+            }
+
+            logger.LogInformation("Analyzing query performance with AI suggestions");
+
+            var analysis = await databaseService.AnalyzeQueryPerformanceAsync(query);
+            return FormatQueryAnalysis(analysis);
+        }
+        catch (McpException)
+        {
+            throw; // Re-throw MCP exceptions as-is
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error analyzing query performance");
+            throw new McpException($"Database error: {ex.Message}", McpErrorCode.InternalError);
+        }
     }
 
     // Helper methods for formatting results
@@ -143,7 +383,7 @@ public static class DatabaseTools
         sb.AppendLine($"Table: {tableInfo.Schema}.{tableInfo.Name}");
         sb.AppendLine($"Row Count: {tableInfo.RowCount:N0}");
         sb.AppendLine();
-        
+
         if (tableInfo.Columns.Any())
         {
             sb.AppendLine("Columns:");
@@ -175,7 +415,7 @@ public static class DatabaseTools
         var sb = new StringBuilder();
         sb.AppendLine("Database Tables:");
         sb.AppendLine("================");
-        
+
         foreach (var table in tables.OrderBy(t => t.Schema).ThenBy(t => t.Name))
         {
             sb.AppendLine($"  {table.Schema}.{table.Name} ({table.RowCount:N0} rows)");
@@ -189,7 +429,7 @@ public static class DatabaseTools
         var sb = new StringBuilder();
         sb.AppendLine("Database Schemas:");
         sb.AppendLine("=================");
-        
+
         foreach (var schema in schemas.OrderBy(s => s.Name))
         {
             sb.AppendLine($"  {schema.Name} ({schema.Type})");
@@ -205,7 +445,7 @@ public static class DatabaseTools
     private static string FormatQueryResult(MsDbServer.Domain.Models.QueryResult result, int maxRows)
     {
         var sb = new StringBuilder();
-        
+
         if (result.ColumnNames == null || result.Rows == null)
         {
             return "No data returned";
@@ -213,11 +453,11 @@ public static class DatabaseTools
 
         sb.AppendLine($"Query Results ({result.RowCount:N0} rows, {result.ExecutionTime.TotalMilliseconds:F2}ms):");
         sb.AppendLine(new string('=', 50));
-        
+
         // Headers
         sb.AppendLine(string.Join(" | ", result.ColumnNames));
         sb.AppendLine(new string('-', result.ColumnNames.Sum(c => c.Length) + (result.ColumnNames.Length - 1) * 3));
-        
+
         // Data (limited to maxRows)
         var rowsToShow = Math.Min(result.Rows.Length, maxRows);
         for (int i = 0; i < rowsToShow; i++)
@@ -230,6 +470,150 @@ public static class DatabaseTools
         {
             sb.AppendLine($"... ({result.Rows.Length - maxRows} more rows)");
         }
+
+        return sb.ToString();
+    }
+
+    private static string FormatExecutionPlan(MsDbServer.Domain.Models.ExecutionPlan plan)
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine("🔍 Query Execution Plan Analysis");
+        sb.AppendLine("=====================================");
+        sb.AppendLine();
+
+        sb.AppendLine("📊 Overall Statistics:");
+        sb.AppendLine($"   Estimated Cost: {plan.EstimatedCost:F4}");
+        sb.AppendLine($"   Estimated Rows: {plan.EstimatedRows:N0}");
+        sb.AppendLine($"   Estimated Time: {plan.EstimatedExecutionTime.TotalMilliseconds:F2} ms");
+        sb.AppendLine($"   Generated: {plan.GeneratedAt:yyyy-MM-dd HH:mm:ss} UTC");
+        sb.AppendLine();
+
+        if (plan.Warnings.Any())
+        {
+            sb.AppendLine("⚠️ Performance Warnings:");
+            foreach (var warning in plan.Warnings)
+            {
+                sb.AppendLine($"   • {warning}");
+            }
+            sb.AppendLine();
+        }
+
+        if (plan.Steps.Any())
+        {
+            sb.AppendLine("📋 Execution Steps:");
+            sb.AppendLine("-------------------");
+            for (int i = 0; i < plan.Steps.Count; i++)
+            {
+                var step = plan.Steps[i];
+                var expensiveIndicator = step.IsExpensive ? "🔥" : "  ";
+                sb.AppendLine($"{expensiveIndicator} Step {i + 1}: {step.Operation}");
+                sb.AppendLine($"     Cost: {step.Cost:F4} | Rows: {step.Rows:N0}");
+                if (!string.IsNullOrEmpty(step.TableName))
+                    sb.AppendLine($"     Table: {step.TableName}");
+                if (!string.IsNullOrEmpty(step.IndexName))
+                    sb.AppendLine($"     Index: {step.IndexName}");
+
+                if (step.Suggestions.Any())
+                {
+                    sb.AppendLine("     💡 Suggestions:");
+                    foreach (var suggestion in step.Suggestions)
+                    {
+                        sb.AppendLine($"        • {suggestion}");
+                    }
+                }
+                sb.AppendLine();
+            }
+        }
+
+        if (!string.IsNullOrEmpty(plan.PlanText))
+        {
+            sb.AppendLine("📄 Detailed Plan:");
+            sb.AppendLine("-----------------");
+            sb.AppendLine(plan.PlanText);
+        }
+
+        return sb.ToString();
+    }
+
+    private static string FormatQueryAnalysis(MsDbServer.Domain.Models.QueryAnalysis analysis)
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine("🤖 AI-Powered Query Performance Analysis");
+        sb.AppendLine("========================================");
+        sb.AppendLine();
+
+        // Performance rating with emoji
+        var ratingEmoji = analysis.PerformanceRating switch
+        {
+            "Excellent" => "🟢",
+            "Good" => "🟡",
+            "Fair" => "🟠",
+            "Poor" => "🔴",
+            _ => "⚪"
+        };
+
+        sb.AppendLine($"📈 Performance Rating: {ratingEmoji} {analysis.PerformanceRating}");
+        if (analysis.PotentialImprovement > 0)
+        {
+            sb.AppendLine($"🚀 Potential Improvement: {analysis.PotentialImprovement:F1}%");
+        }
+        sb.AppendLine($"🕐 Analyzed: {analysis.AnalyzedAt:yyyy-MM-dd HH:mm:ss} UTC");
+        sb.AppendLine();
+
+        if (analysis.Issues.Any())
+        {
+            sb.AppendLine("❌ Issues Identified:");
+            foreach (var issue in analysis.Issues)
+            {
+                sb.AppendLine($"   • {issue}");
+            }
+            sb.AppendLine();
+        }
+
+        if (analysis.Recommendations.Any())
+        {
+            sb.AppendLine("💡 General Recommendations:");
+            foreach (var recommendation in analysis.Recommendations)
+            {
+                sb.AppendLine($"   • {recommendation}");
+            }
+            sb.AppendLine();
+        }
+
+        if (analysis.IndexSuggestions.Any())
+        {
+            sb.AppendLine("🗂️ Index Suggestions:");
+            foreach (var indexSuggestion in analysis.IndexSuggestions)
+            {
+                sb.AppendLine($"   • {indexSuggestion}");
+            }
+            sb.AppendLine();
+        }
+
+        if (analysis.RewriteSuggestions.Any())
+        {
+            sb.AppendLine("✏️ Query Rewrite Suggestions:");
+            foreach (var rewriteSuggestion in analysis.RewriteSuggestions)
+            {
+                sb.AppendLine($"   • {rewriteSuggestion}");
+            }
+            sb.AppendLine();
+        }
+
+        if (!string.IsNullOrEmpty(analysis.OptimizedQuery))
+        {
+            sb.AppendLine("🔧 Optimized Query Suggestion:");
+            sb.AppendLine("------------------------------");
+            sb.AppendLine(analysis.OptimizedQuery);
+            sb.AppendLine();
+        }
+
+        // Include execution plan summary
+        sb.AppendLine("📊 Execution Plan Summary:");
+        sb.AppendLine($"   Cost: {analysis.ExecutionPlan.EstimatedCost:F4}");
+        sb.AppendLine($"   Rows: {analysis.ExecutionPlan.EstimatedRows:N0}");
+        sb.AppendLine($"   Steps: {analysis.ExecutionPlan.Steps.Count}");
+        sb.AppendLine($"   Warnings: {analysis.ExecutionPlan.Warnings.Count}");
 
         return sb.ToString();
     }

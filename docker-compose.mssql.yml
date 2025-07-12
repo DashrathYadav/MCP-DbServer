@@ -1,0 +1,63 @@
+services:
+  # MSSQL MCP Server Only
+  mcp-mssql:
+    build: .
+    container_name: mcp-server-mssql
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_URLS=http://+:8081
+      - McpServer__Database__Provider=mssql
+      - McpServer__Database__ConnectionString=Server=mssql-db,1433;Database=app_db;User Id=sa;Password=Temp@123;TrustServerCertificate=true;
+      - McpServer__Transport__Stdio__Enabled=false
+      - McpServer__Transport__Http__Enabled=true
+      - McpServer__Transport__Http__Port=8081
+      - McpServer__Logging__LogLevel=Information
+    ports:
+      - "8081:8081"
+    depends_on:
+      mssql-db:
+        condition: service_healthy
+    networks:
+      - mcp-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # MSSQL Database
+  mssql-db:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    platform: linux/amd64
+    container_name: mcp-mssql-db
+    environment:
+      - ACCEPT_EULA=Y
+      - SA_PASSWORD=Temp@123
+      - MSSQL_DB=app_db
+    ports:
+      - "1433:1433"
+    volumes:
+      - mssql_data:/var/opt/mssql
+      - ./docker/mssql/init:/docker-entrypoint-initdb.d
+    networks:
+      - mcp-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P Temp@123 -Q 'SELECT 1' -C || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+
+volumes:
+  mssql_data:
+    driver: local
+
+networks:
+  mcp-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

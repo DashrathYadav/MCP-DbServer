@@ -76,3 +76,51 @@ public class ForeignKeyInfo
     public string ReferencedColumn { get; init; } = string.Empty;
     public string ReferencedSchema { get; init; } = string.Empty;
 }
+
+/// <summary>
+/// Represents a query execution plan
+/// </summary>
+public class ExecutionPlan
+{
+    public string Query { get; init; } = string.Empty;
+    public string PlanText { get; init; } = string.Empty;
+    public string PlanXml { get; init; } = string.Empty;
+    public double EstimatedCost { get; init; }
+    public double EstimatedRows { get; init; }
+    public TimeSpan EstimatedExecutionTime { get; init; }
+    public List<ExecutionPlanStep> Steps { get; init; } = new();
+    public List<string> Warnings { get; init; } = new();
+    public DateTime GeneratedAt { get; init; } = DateTime.UtcNow;
+}
+
+/// <summary>
+/// Represents a step in the execution plan
+/// </summary>
+public class ExecutionPlanStep
+{
+    public string Operation { get; init; } = string.Empty;
+    public string Details { get; init; } = string.Empty;
+    public double Cost { get; init; }
+    public double Rows { get; init; }
+    public string? TableName { get; init; }
+    public string? IndexName { get; init; }
+    public bool IsExpensive { get; init; }
+    public List<string> Suggestions { get; init; } = new();
+}
+
+/// <summary>
+/// Represents AI-powered query performance analysis
+/// </summary>
+public class QueryAnalysis
+{
+    public string OriginalQuery { get; init; } = string.Empty;
+    public ExecutionPlan ExecutionPlan { get; init; } = new();
+    public string PerformanceRating { get; init; } = string.Empty; // Excellent, Good, Fair, Poor
+    public List<string> Issues { get; init; } = new();
+    public List<string> Recommendations { get; init; } = new();
+    public string? OptimizedQuery { get; init; }
+    public List<string> IndexSuggestions { get; init; } = new();
+    public List<string> RewriteSuggestions { get; init; } = new();
+    public double PotentialImprovement { get; init; } // Percentage
+    public DateTime AnalyzedAt { get; init; } = DateTime.UtcNow;
+}
