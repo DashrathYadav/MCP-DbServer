@@ -1,12 +1,16 @@
 {
   "servers": {
-    "MsDbServer": {
+    "database-server-mssql": {
       "command": "dotnet",
-      "args": ["run", "--project", "MsDbServer/MsDbServer.csproj"],
+      "args": ["run", "--project", "MsDbServer"],
       "cwd": "${workspaceFolder}",
       "env": {
-        "ConnectionStrings__DefaultConnection": "server=localhost;port=3306;database=your_database;user=your_user;password=your_password"
+        "McpServer__Transport__Stdio__Enabled": "true",
+        "McpServer__Transport__Http__Enabled": "false",
+        "McpServer__Database__Provider": "mssql",
+        "McpServer__Database__ConnectionString": "Server=localhost,1433;Database=app_db;User Id=sa;Password=Temp@123;TrustServerCertificate=true;",
+        "McpServer__Logging__LogLevel": "Information"
       }
-    }
+    },
   }
 }

@@ -1,0 +1,34 @@
+{
+  "folders": [
+    {
+      "path": "."
+    }
+  ],
+  "settings": {
+    "mcp.enabled": true,
+    "mcp.autoConnect": true,
+    "mcp.servers": {
+      "database-server": {
+        "command": "dotnet",
+        "args": ["run", "--project", "MsDbServer"],
+        "cwd": "${workspaceFolder}",
+        "env": {
+          "McpServer__Transport__Stdio__Enabled": "true",
+          "McpServer__Transport__Http__Enabled": "false",
+          "McpServer__Database__Provider": "mysql",
+          "McpServer__Database__ConnectionString": "server=localhost;port=3306;database=rent_wizard;user=root;password=Temp@123",
+          "McpServer__Logging__LogLevel": "Information"
+        }
+      }
+    },
+    "dotnet.defaultSolution": "MCP-DbServer.sln"
+  },
+  "extensions": {
+    "recommendations": [
+      "ms-dotnettools.csharp",
+      "ms-dotnettools.csdevkit",
+      "modelcontextprotocol.mcp-client",
+      "ms-vscode.vscode-json"
+    ]
+  }
+}
