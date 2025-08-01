@@ -210,7 +210,7 @@ public class SqlServerDatabaseRepository : IDatabaseRepository
     {
         try
         {
-            var countQuery = $"SELECT COUNT(*) as RowCount FROM [{schema}].[{tableName}]";
+            var countQuery = $"SELECT COUNT(*) as [RowCount] FROM [{schema}].[{tableName}]";
             var result = await ExecuteQueryAsync(countQuery, cancellationToken);
 
             if (result.Success && result.Rows != null && result.Rows.Length > 0)
